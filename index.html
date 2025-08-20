@@ -32,175 +32,270 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>瓷砖出入库管理</h1>
-        <div class="mode-selector">
-            <button id="outbound-mode" class="active" onclick="switchMode('outbound')">出货计划</button>
-            <button id="inbound-mode" onclick="switchMode('inbound')">海运入库</button>
-        </div>
-        <div class="card"><div id="date"></div></div>
+<div class="container">
+    <h1>瓷砖出入库管理</h1>
+    <div class="mode-selector">
+        <button id="outbound-mode" class="active" onclick="switchMode('outbound')">出货计划</button>
+        <button id="inbound-mode" onclick="switchMode('inbound')">海运入库</button>
+    </div>
+    <div class="card"><div id="date"></div></div>
 
-        <div id="outbound-content" class="mode-content active">
-            <div class="card">
-                <h2>订单信息</h2>
-                <div class="form-group"><label>客户 (可选)</label><input type="text" id="customer"></div>
-                <div class="form-group">
-                    <label>是否付款</label>
-                    <select id="payment">
-                        <option value="">请选择</option>
-                        <option value="yes">是</option>
-                        <option value="no">否</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>单位或车牌</label><input type="text" id="unit"></div>
-            </div>
-        </div>
-
-        <div id="inbound-content" class="mode-content">
-            <div class="card">
-                <h2>入库信息</h2>
-                <div class="form-group"><label>柜号 *</label><input type="text" id="containerNo"></div>
-                <div class="form-group">
-                    <label>入库仓库 *</label>
-                    <select id="warehouse">
-                        <option value="">请选择</option>
-                        <option value="1号仓库">1号仓库</option>
-                        <option value="k38仓库">k38仓库</option>
-                        <option value="k39仓库">k39仓库</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
+    <div id="outbound-content" class="mode-content active">
         <div class="card">
-            <h2>瓷砖信息</h2>
-            <div class="form-group"><label>编号 *</label><input type="text" id="code"></div>
+            <h2>订单信息</h2>
+            <div class="form-group"><label>客户 (可选)</label><input type="text" id="customer" oninput="saveData()"></div>
             <div class="form-group">
-                <label>规格 *</label>
-                <select id="size">
+                <label>是否付款</label>
+                <select id="payment" onchange="saveData()">
                     <option value="">请选择</option>
-                    <option value="300*300">300*300</option>
-                    <option value="300*600">300*600</option>
-                    <option value="400*400">400*400</option>
-                    <option value="400*800">400*800</option>
-                    <option value="470*1200">470*1200</option>
-                    <option value="600*600">600*600</option>
-                    <option value="600*1200">600*1200</option>
-                    <option value="750*1200">750*1200</option>
-                    <option value="800*800">800*800</option>
-                    <option value="200*1200">200*1200</option>
+                    <option value="yes">是</option>
+                    <option value="no">否</option>
                 </select>
             </div>
-            <div class="form-group"><label>数量 *</label><input type="text" id="quantity"></div>
-            <div class="form-group"><label>色号 (可选)</label><input type="text" id="color"></div>
-            <button onclick="addTile()">添加到列表</button>
-        </div>
-
-        <div class="card">
-            <h2>已添加的瓷砖</h2>
-            <div id="tiles-list">尚未添加瓷砖</div>
-            <div class="flex-row">
-                <button class="gray" onclick="clearAll()">清空</button>
-                <button class="secondary" onclick="generatePlan()">生成计划</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>计划结果</h2>
-            <div id="result"></div>
-            <button onclick="copyResult()">复制内容</button>
+            <div class="form-group"><label>单位或车牌</label><input type="text" id="unit" oninput="saveData()"></div>
         </div>
     </div>
-    <div class="toast" id="toast"></div>
 
-    <script>
-        var tiles = [], tileIndex = 0, currentMode = 'outbound';
-        window.onload = function() {
-            var now = new Date();
-            document.getElementById('date').textContent = 
-                now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
-        };
-        function switchMode(mode){
-            currentMode = mode;
-            document.getElementById('outbound-mode').classList.remove('active');
-            document.getElementById('inbound-mode').classList.remove('active');
-            document.getElementById(mode+'-mode').classList.add('active');
-            document.getElementById('outbound-content').classList.remove('active');
-            document.getElementById('inbound-content').classList.remove('active');
-            document.getElementById(mode+'-content').classList.add('active');
-            showToast(mode==='outbound'?'已切换到出货计划':'已切换到海运入库');
-        }
-        function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>{t.style.display='none';},2000);}
-        function addTile(){
-            var code=document.getElementById('code').value.trim(),
-                size=document.getElementById('size').value,
-                quantity=document.getElementById('quantity').value.trim(),
-                color=document.getElementById('color').value.trim();
-            if(!code){showToast('请填写编号');return;}
-            if(!size){showToast('请选择规格');return;}
-            if(!quantity){showToast('请填写数量');return;}
-            tileIndex++;tiles.push({id:tileIndex,code,size,quantity,color});
+    <div id="inbound-content" class="mode-content">
+        <div class="card">
+            <h2>入库信息</h2>
+            <div class="form-group"><label>柜号 *</label><input type="text" id="containerNo" oninput="saveData()"></div>
+            <div class="form-group">
+                <label>入库仓库 *</label>
+                <select id="warehouse" onchange="saveData()">
+                    <option value="">请选择</option>
+                    <option value="1号仓库">1号仓库</option>
+                    <option value="k38仓库">k38仓库</option>
+                    <option value="k39仓库">k39仓库</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>瓷砖信息</h2>
+        <div class="form-group"><label>编号 *</label><input type="text" id="code"></div>
+        <div class="form-group">
+            <label>规格 *</label>
+            <select id="size" onchange="handleSizeChange()">
+                <option value="">请选择</option>
+                <option value="300*300">300*300</option>
+                <option value="300*600">300*600</option>
+                <option value="400*400">400*400</option>
+                <option value="400*800">400*800</option>
+                <option value="470*1200">470*1200</option>
+                <option value="470*1350">470*1350</option>
+                <option value="600*600">600*600</option>
+                <option value="600*1200">600*1200</option>
+                <option value="750*1500">750*1500</option>
+                <option value="800*800">800*800</option>
+                <option value="200*1200">200*1200</option>
+                <option value="custom">自定义</option>
+            </select>
+            <input type="text" id="customSize" placeholder="请输入自定义规格" style="margin-top:5px; display:none;" oninput="saveData()">
+        </div>
+        <div class="form-group"><label>数量 *</label><input type="text" id="quantity" oninput="this.value=this.value.replace(/\D/g,''); saveData();"></div>
+        <div class="form-group"><label>色号 (可选)</label><input type="text" id="color"></div>
+        <button onclick="addTile()">添加到列表</button>
+    </div>
+
+    <div class="card">
+        <h2>已添加的瓷砖</h2>
+        <div id="tiles-list">尚未添加瓷砖</div>
+        <div class="flex-row">
+            <button class="gray" onclick="clearAll()">清空</button>
+            <button class="secondary" onclick="generatePlan()">生成计划</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>计划结果</h2>
+        <div id="result"></div>
+        <button onclick="copyResult()">复制内容</button>
+    </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+    var tiles = [], tileIndex = 0, currentMode = 'outbound';
+
+    window.onload = function() {
+        var now = new Date();
+        document.getElementById('date').textContent = 
+            now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
+
+        // 恢复数据
+        var saved = localStorage.getItem('tilePlanData');
+        if (saved) {
+            var data = JSON.parse(saved);
+            tiles = data.tiles || [];
+            currentMode = data.currentMode || 'outbound';
+            document.getElementById('customer').value = data.customer || '';
+            document.getElementById('payment').value = data.payment || '';
+            document.getElementById('unit').value = data.unit || '';
+            document.getElementById('containerNo').value = data.containerNo || '';
+            document.getElementById('warehouse').value = data.warehouse || '';
+            document.getElementById('result').textContent = data.result || '';
+            document.getElementById('customSize').value = data.customSize || '';
             updateTilesList();
-            document.getElementById('code').value='';document.getElementById('quantity').value='';document.getElementById('color').value='';
-            showToast('已添加');
+            switchMode(currentMode);
+            handleSizeChange();
         }
-        function updateTilesList(){
-            var listEl=document.getElementById('tiles-list');
-            if(tiles.length===0){listEl.innerHTML='尚未添加瓷砖';return;}
-            listEl.innerHTML=tiles.map((t,i)=>`<div class="tile-item">${i+1}. ${t.code} ${t.size} ${t.quantity}件 
-            <button style="padding:3px 6px;font-size:12px;background:#ff4d4f;" onclick="deleteTile(${t.id})">删除</button></div>`).join('');
+    };
+
+    function switchMode(mode){
+        currentMode = mode;
+        document.getElementById('outbound-mode').classList.remove('active');
+        document.getElementById('inbound-mode').classList.remove('active');
+        document.getElementById(mode+'-mode').classList.add('active');
+        document.getElementById('outbound-content').classList.remove('active');
+        document.getElementById('inbound-content').classList.remove('active');
+        document.getElementById(mode+'-content').classList.add('active');
+        showToast(mode==='outbound'?'已切换到出货计划':'已切换到海运入库');
+        saveData();
+    }
+
+    function showToast(msg){
+        var t=document.getElementById('toast');
+        t.textContent=msg;
+        t.style.display='block';
+        setTimeout(()=>{t.style.display='none';},2000);
+    }
+
+    function handleSizeChange() {
+        var sizeSelect = document.getElementById('size');
+        var customInput = document.getElementById('customSize');
+        if (sizeSelect.value === 'custom') {
+            customInput.style.display = 'block';
+            customInput.value = '';
+        } else {
+            customInput.style.display = 'none';
+            customInput.value = '';
         }
-        function deleteTile(id){tiles=tiles.filter(t=>t.id!==id);updateTilesList();showToast('已删除');}
-        function clearAll(){
-            if(confirm('确定要清空吗？')){
-                tiles=[];['customer','payment','unit','containerNo','warehouse','code','size','quantity','color'].forEach(id=>{document.getElementById(id).value='';});
-                document.getElementById('result').textContent='';updateTilesList();
-            }
+        saveData();
+    }
+
+    function addTile(){
+        var code=document.getElementById('code').value.trim();
+        var sizeSelect=document.getElementById('size');
+        var size=sizeSelect.value;
+        if(size==='custom'){
+            size=document.getElementById('customSize').value.trim();
         }
-        function generatePlan(){
-            if(tiles.length===0){showToast('请先添加瓷砖');return;}
-            if(currentMode==='inbound'){
-                var containerNo=document.getElementById('containerNo').value.trim(),
-                    warehouse=document.getElementById('warehouse').value;
-                if(!containerNo){showToast('请填写柜号');return;}
-                if(!warehouse){showToast('请选择入库仓库');return;}
-            }
-            var plan=document.getElementById('date').textContent+'\n';
-            if(currentMode==='outbound'){
-                plan+='出货计划\n';
-                var customer=document.getElementById('customer').value.trim(),
-                    payment=document.getElementById('payment').value,
-                    unit=document.getElementById('unit').value.trim();
-                if(customer) plan+='客户：'+customer+'\n';
-                if(payment==='yes') plan+='已付款\n';
-                if(payment==='no') plan+='未付款\n';
-                if(unit) plan+='单位/车牌：'+unit+'\n';
-            }else{
-                plan+='海运入库：\n';
-                plan+='柜号：'+document.getElementById('containerNo').value.trim()+'\n';
-                plan+='入库仓库：'+document.getElementById('warehouse').value+'\n';
-            }
-            plan+='\n';
-            tiles.forEach((t,i)=>{
-                plan+=(i+1)+'.ကုဒ်နိပတ်/编号：'+t.code+'\n';
-                plan+='အလျားအနံ/规格：'+t.size+'\n';
-                plan+='အရေအတွက်/数量：'+t.quantity+'\n';
-                if(t.color) plan+='အရောင်ကုဒ်/色号：'+t.color+'\n';
-                plan+='\n';
+        var quantity=document.getElementById('quantity').value.trim();
+        var color=document.getElementById('color').value.trim();
+
+        if(!code){showToast('请填写编号');return;}
+        if(!size){showToast('请填写规格');return;}
+        if(!quantity){showToast('请填写数量');return;}
+
+        tileIndex++;
+        tiles.push({id:tileIndex,code,size,quantity,color});
+        updateTilesList();
+
+        document.getElementById('code').value='';
+        document.getElementById('quantity').value='';
+        document.getElementById('color').value='';
+        document.getElementById('size').value='';
+        document.getElementById('customSize').value='';
+        document.getElementById('customSize').style.display='none';
+
+        showToast('已添加');
+        saveData();
+    }
+
+    function updateTilesList(){
+        var listEl=document.getElementById('tiles-list');
+        if(tiles.length===0){listEl.innerHTML='尚未添加瓷砖';return;}
+        listEl.innerHTML=tiles.map((t,i)=>`<div class="tile-item">${i+1}. ${t.code} ${t.size} ${t.quantity}件 
+        <button style="padding:3px 6px;font-size:12px;background:#ff4d4f;" onclick="deleteTile(${t.id})">删除</button></div>`).join('');
+    }
+
+    function deleteTile(id){
+        tiles=tiles.filter(t=>t.id!==id);
+        updateTilesList();
+        showToast('已删除');
+        saveData();
+    }
+
+    function clearAll(){
+        if(confirm('确定要清空吗？')){
+            tiles=[];
+            ['customer','payment','unit','containerNo','warehouse','code','size','quantity','color','customSize'].forEach(id=>{
+                document.getElementById(id).value='';
             });
-            document.getElementById('result').textContent=plan;
-            showToast('计划已生成');
+            document.getElementById('customSize').style.display='none';
+            document.getElementById('result').textContent='';
+            updateTilesList();
+            localStorage.removeItem('tilePlanData');
         }
-        async function copyResult(){
-            var text=document.getElementById('result').textContent;
-            if(!text){showToast('请先生成计划');return;}
-            try{
-                await navigator.clipboard.writeText(text);
-                showToast('已复制到剪贴板');
-            }catch(e){
-                showToast('复制失败，请手动选择复制');
-            }
+    }
+
+    function generatePlan(){
+        if(tiles.length===0){showToast('请先添加瓷砖');return;}
+        if(currentMode==='inbound'){
+            var containerNo=document.getElementById('containerNo').value.trim(),
+                warehouse=document.getElementById('warehouse').value;
+            if(!containerNo){showToast('请填写柜号');return;}
+            if(!warehouse){showToast('请选择入库仓库');return;}
         }
-    </script>
+        var plan=document.getElementById('date').textContent+'\n';
+        if(currentMode==='outbound'){
+            plan+='出货计划\n';
+            var customer=document.getElementById('customer').value.trim(),
+                payment=document.getElementById('payment').value,
+                unit=document.getElementById('unit').value.trim();
+            if(customer) plan+='客户：'+customer+'\n';
+            if(payment==='yes') plan+='已付款\n';
+            if(payment==='no') plan+='未付款\n';
+            if(unit) plan+='单位/车牌：'+unit+'\n';
+        }else{
+            plan+='海运入库：\n';
+            plan+='柜号：'+document.getElementById('containerNo').value.trim()+'\n';
+            plan+='入库仓库：'+document.getElementById('warehouse').value+'\n';
+        }
+        plan+='\n';
+        tiles.forEach((t,i)=>{
+            plan+=(i+1)+'.ကုဒ်နိပတ်/编号：'+t.code+'\n';
+            plan+='အလျားအနံ/规格：'+t.size+'\n';
+            plan+='အရေအတွက်/数量：'+t.quantity+'\n';
+            if(t.color) plan+='အရောင်ကုဒ်/色号：'+t.color+'\n';
+            plan+='\n';
+        });
+        document.getElementById('result').textContent=plan;
+        showToast('计划已生成');
+        saveData();
+    }
+
+    async function copyResult(){
+        var text=document.getElementById('result').textContent;
+        if(!text){showToast('请先生成计划');return;}
+        try{
+            await navigator.clipboard.writeText(text);
+            showToast('已复制到剪贴板');
+        }catch(e){
+            showToast('复制失败，请手动选择复制');
+        }
+    }
+
+    function saveData(){
+        const data = {
+            tiles: tiles,
+            customer: document.getElementById('customer').value,
+            payment: document.getElementById('payment').value,
+            unit: document.getElementById('unit').value,
+            containerNo: document.getElementById('containerNo').value,
+            warehouse: document.getElementById('warehouse').value,
+            result: document.getElementById('result').textContent,
+            currentMode: currentMode,
+            customSize: document.getElementById('customSize').value
+        };
+        try {
+            localStorage.setItem('tilePlanData', JSON.stringify(data));
+        } catch(e) {
+            console.warn('保存数据失败，可能是微信浏览器限制', e);
+        }
+    }
+</script>
 </body>
 </html>
