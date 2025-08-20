@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瓷砖出入库管理系统</title>
+    <!-- 引入SheetJS库用于处理Excel文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 引入Firebase用于后端存储 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
+    <style>
+        /* 原有样式保持不变 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { padding: 15px; background-color: #f5f5f5; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 1px 3px #eee; }
+        h1, h2 { margin-bottom: 15px; color: #333; }
+        h1 { text-align: center; color: #4F46E5; font-size: 20px; padding: 10px 0; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; color: #666; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 15px; }
+        button { background-color: #4F46E5; color: white; border: none; padding: 12px; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 5px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background-color: #10B981; }
+        button.gray { background-color: #f0f0f0; color: #666; }
+        button.admin { background-color: #f59e0b; }
+        .flex-row { display: flex; gap: 10px; }
+        .flex-row button { flex: 1; }
+        #tiles-list { margin: 10px 0; padding: 10px; border: 1px dashed #ddd; min-height: 60px; }
+        .tile-item { padding: 8px; background: #f9f9f9; margin-bottom: 5px; border-radius: 4px; }
+        #result { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; white-space: pre-wrap; font-size: 14px; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; border-radius: 4px; display: none; z-index: 1000; }
+        .mode-selector { display: flex; margin-bottom: 15px; flex-wrap: wrap; }
+        .mode-selector button { flex: 1; margin: 0; min-width: 120px; }
+        .mode-selector button.active { background-color: #4F46E5; color: white; }
+        .mode-selector button:not(.active) { background-color: #f0f0f0; color: #666; }
+        .mode-content { display: none; }
+        .mode-content.active { display: block; }
+        .stock-item { padding: 10px; border-bottom: 1px solid #eee; }
+        .stock-item:last-child { border-bottom: none; }
+        .common-content { display: block; }
+        .stock-mode .common-content { display: none; }
+        
+        /* 导入区域样式 */
+        .import-area {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .import-area:hover {
+            border-color: #4F46E5;
+        }
+        .import-icon {
+            font-size: 24px;
+            color: #4F46E5;
+            margin-bottom: 10px;
+        }
+        #file-input {
+            display: none;
+        }
+        .last-update {
+            font-size: 13px;
+            color: #666;
+            margin-top: 10px;
+            text-align: right;
+        }
+        .github-footer {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin-top: 20px;
+            padding: 10px;
+        }
+        .admin-section {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #fff3cd;
+            border-radius: 4px;
+            display: none;
+        }
+        .auth-section {
+            margin-bottom: 15px;
+        }
+        .error-message {
+            color: #dc2626;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+        .offline-notice {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        /* 表格样式 */
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .stock-table th, .stock-table td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .stock-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .stock-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>瓷砖出入库管理系统</h1>
+    
+    <!-- 离线模式提示 -->
+    <div class="offline-notice" id="offlineNotice">
+        注意：系统正以离线模式运行，库存数据将使用本地缓存。
+    </div>
+    
+    <!-- 管理员认证区域 -->
+    <div class="card auth-section">
+        <div class="form-group">
+            <label>管理员密码</label>
+            <input type="password" id="adminPassword" placeholder="输入管理员密码">
+            <div class="error-message" id="adminError"></div>
+        </div>
+        <button class="admin" id="adminLoginBtn">管理员登录</button>
+    </div>
+    
+    <!-- 管理员功能区域（默认隐藏） -->
+    <div class="card admin-section" id="adminSection">
+        <h2>管理员功能</h2>
+        <div class="import-area" onclick="document.getElementById('adminFileInput').click()">
+            <div class="import-icon">📂</div>
+            <p>点击或拖拽Excel文件到此处更新公共库存数据</p>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">支持 .xlsx 和 .xls 格式</p>
+            <input type="file" id="adminFileInput" accept=".xlsx,.xls" onchange="handleAdminFileUpload(event)">
+        </div>
+        <button class="gray" onclick="logoutAdmin()">退出管理员模式</button>
+    </div>
+
+    <div class="mode-selector">
+        <button id="outbound-mode" class="active" onclick="switchMode('outbound')">出货计划</button>
+        <button id="inbound-mode" onclick="switchMode('inbound')">海运入库</button>
+        <button id="stock-mode" onclick="switchMode('stock')">库存查询</button>
+    </div>
+    <div class="card"><div id="date"></div></div>
+
+    <div id="outbound-content" class="mode-content active">
+        <div class="card">
+            <h2>订单信息</h2>
+            <div class="form-group"><label>客户 (可选)</label><input type="text" id="customer" oninput="saveData()"></div>
+            <div class="form-group">
+                <label>是否付款</label>
+                <select id="payment" onchange="saveData()">
+                    <option value="">请选择</option>
+                    <option value="yes">是</option>
+                    <option value="no">否</option>
+                </select>
+            </div>
+            <div class="form-group"><label>单位或车牌</label><input type="text" id="unit" oninput="saveData()"></div>
+        </div>
+    </div>
+
+    <div id="inbound-content" class="mode-content">
+        <div class="card">
+            <h2>入库信息</h2>
+            <div class="form-group"><label>柜号 *</label><input type="text" id="containerNo" oninput="saveData()"></div>
+            <div class="form-group">
+                <label>入库仓库 *</label>
+                <select id="warehouse" onchange="saveData()">
+                    <option value="">请选择</option>
+                    <option value="1号仓库">1号仓库</option>
+                    <option value="k38仓库">k38仓库</option>
+                    <option value="k39仓库">k39仓库</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="stock-content" class="mode-content">
+        <div class="card">
+            <h2>库存查询</h2>
+            <div class="form-group">
+                <label>瓷砖编号 (支持模糊查询)</label>
+                <input type="text" id="stockCode" placeholder="输入编号关键词">
+            </div>
+            <button onclick="searchStock()">查询库存</button>
+            
+            <div class="last-update" id="last-update-time">
+                库存最后更新时间：加载中...
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>查询结果</h2>
+            <div class="table-container">
+                <table class="stock-table" id="stock-result-table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>编号</th>
+                            <th>色号</th>
+                            <th>数量(箱)</th>
+                            <th>仓库</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stock-result-body">
+                        <!-- 结果将在这里动态填充 -->
+                    </tbody>
+                </table>
+                <div id="stock-result-message">请输入编号并点击查询</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公共内容区域 -->
+    <div class="common-content">
+        <div class="card">
+            <h2>瓷砖信息</h2>
+            <div class="form-group"><label>编号 *</label><input type="text" id="code"></div>
+            <div class="form-group">
+                <label>规格 *</label>
+                <select id="size" onchange="handleSizeChange()">
+                    <option value="">请选择</option>
+                    <option value="300*300">300*300</option>
+                    <option value="300*600">300*600</option>
+                    <option value="400*400">400*400</option>
+                    <option value="400*800">400*800</option>
+                    <option value="470*1200">470*1200</option>
+                    <option value="470*1350">470*1350</option>
+                    <option value="600*600">600*600</option>
+                    <option value="600*1200">600*1200</option>
+                    <option value="750*1500">750*1500</option>
+                    <option value="800*800">800*800</option>
+                    <option value="200*1200">200*1200</option>
+                    <option value="custom">自定义</option>
+                </select>
+                <input type="text" id="customSize" placeholder="请输入自定义规格" style="margin-top:5px; display:none;" oninput="saveData()">
+            </div>
+            <div class="form-group"><label>数量 *</label><input type="text" id="quantity" oninput="this.value=this.value.replace(/\D/g,''); saveData();"></div>
+            <div class="form-group"><label>色号 (可选)</label><input type="text" id="color"></div>
+            <button onclick="addTile()">添加到列表</button>
+        </div>
+
+        <div class="card">
+            <h2>已添加的瓷砖</h2>
+            <div id="tiles-list">尚未添加瓷砖</div>
+            <div class="flex-row">
+                <button class="gray" onclick="clearAll()">清空</button>
+                <button class="secondary" onclick="generatePlan()">生成计划</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>计划结果</h2>
+            <div id="result"></div>
+            <button onclick="copyResult()">复制内容</button>
+        </div>
+    </div>
+    
+    <div class="github-footer">
+        瓷砖出入库管理系统 &copy; 2023
+    </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+    // 全局变量
+    let firebaseApp = null;
+    let database = null;
+    let stockRef = null;
+    let tiles = [];
+    let tileIndex = 0;
+    let currentMode = 'outbound';
+    let stockData = [];
+    let isAdmin = false;
+    let isOfflineMode = false;
+    const ADMIN_PASSWORD = "admin"; // 请修改为安全密码
+    
+    // Firebase配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyC65DEOgj4WeksRRVmw4ZTrNkCB83SoQpI",
+        authDomain: "tile-management-system-f5db8.firebaseapp.com",
+        databaseURL: "https://tile-management-system-f5db8-default-rtdb.firebaseio.com",
+        projectId: "tile-management-system-f5db8",
+        storageBucket: "tile-management-system-f5db8.appspot.com",
+        messagingSenderId: "925027091187",
+        appId: "1:925027091187:web:a2bb160b629f541abded86"
+    };
+
+    // 页面加载完成后执行
+    window.addEventListener('DOMContentLoaded', function() {
+        // 显示当前日期
+        const now = new Date();
+        document.getElementById('date').textContent = 
+            `${now.getFullYear()}/${(now.getMonth()+1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
+
+        // 绑定管理员登录按钮事件
+        document.getElementById('adminLoginBtn').addEventListener('click', authenticateAdmin);
+
+        // 初始化系统
+        initSystem();
+    });
+
+    // 初始化系统
+    function initSystem() {
+        // 尝试初始化Firebase
+        try {
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                stockRef = database.ref('tileStock');
+                isOfflineMode = false;
+            } else {
+                // Firebase库未加载或已初始化
+                isOfflineMode = true;
+                document.getElementById('offlineNotice').style.display = 'block';
+            }
+        } catch (error) {
+            console.error("Firebase初始化错误:", error);
+            isOfflineMode = true;
+            document.getElementById('offlineNotice').style.display = 'block';
+            showToast('使用离线模式运行，部分功能可能受限');
+        }
+
+        // 尝试加载库存数据
+        loadStockData();
+
+        // 恢复本地计划数据
+        restoreSavedData();
+    }
+
+    // 加载库存数据（优先从Firebase，失败则使用本地缓存）
+    function loadStockData() {
+        // 检查本地是否有缓存的库存数据
+        const cachedStock = localStorage.getItem('cachedStockData');
+        const cachedTime = localStorage.getItem('cachedStockTime');
+        
+        if (cachedStock) {
+            try {
+                stockData = JSON.parse(cachedStock);
+                updateLastUpdateTime(cachedTime);
+                showToast('已加载缓存的库存数据');
+            } catch (e) {
+                console.error('解析缓存的库存数据失败', e);
+            }
+        }
+
+        // 如果在线，尝试从Firebase加载最新数据
+        if (!isOfflineMode && firebaseApp) {
+            try {
+                stockRef.once('value').then(snapshot => {
+                    const data = snapshot.val();
+                    if (data && data.stockData) {
+                        stockData = data.stockData;
+                        updateLastUpdateTime(data.updateTime);
+                        
+                        // 缓存到本地
+                        localStorage.setItem('cachedStockData', JSON.stringify(stockData));
+                        localStorage.setItem('cachedStockTime', data.updateTime);
+                        
+                        showToast('已加载最新库存数据');
+                    } else {
+                        showToast('使用默认库存数据');
+                        setDefaultStockData();
+                    }
+                }).catch(error => {
+                    console.error('从Firebase加载库存数据失败', error);
+                    if (stockData.length === 0) {
+                        setDefaultStockData();
+                    }
+                    showToast('无法连接到服务器，使用缓存数据');
+                });
+            } catch (error) {
+                console.error('加载库存数据时发生异常', error);
+                if (stockData.length === 0) {
+                    setDefaultStockData();
+                }
+            }
+        } else if (stockData.length === 0) {
+            // 如果离线且没有缓存数据，使用默认数据
+            setDefaultStockData();
+        }
+    }
+
+    // 设置默认库存数据
+    function setDefaultStockData() {
+        stockData = [
+            { code: "TC001", color: "白色", warehouse: "1号仓库", quantity: 150 },
+            { code: "TC002", color: "灰色", warehouse: "k38仓库", quantity: 80 },
+            { code: "TC003", color: "米黄", warehouse: "k39仓库", quantity: 200 },
+            { code: "TC004", color: "浅灰", warehouse: "1号仓库", quantity: 120 },
+            { code: "TC005", color: "深灰", warehouse: "k38仓库", quantity: 95 }
+        ];
+        updateLastUpdateTime(null);
+    }
+
+    // 管理员认证
+    function authenticateAdmin() {
+        try {
+            const passwordInput = document.getElementById('adminPassword');
+            const errorElement = document.getElementById('adminError');
+            
+            errorElement.style.display = 'none';
+            const password = passwordInput.value.trim();
+            
+            if (!password) {
+                errorElement.textContent = '请输入管理员密码';
+                errorElement.style.display = 'block';
+                passwordInput.focus();
+                return;
+            }
+            
+            if (password === ADMIN_PASSWORD) {
+                isAdmin = true;
+                document.getElementById('adminSection').style.display = 'block';
+                passwordInput.value = '';
+                showToast('管理员登录成功');
+            } else {
+                errorElement.textContent = '密码错误，请重新输入';
+                errorElement.style.display = 'block';
+                passwordInput.select();
+            }
+        } catch (error) {
+            console.error('管理员登录过程出错:', error);
+            showToast('登录过程出错: ' + error.message);
+        }
+    }
+
+    // 管理员退出
+    function logoutAdmin() {
+        isAdmin = false;
+        document.getElementById('adminSection').style.display = 'none';
+        showToast('已退出管理员模式');
+    }
+
+    // 管理员上传文件处理
+    function handleAdminFileUpload(event) {
+        try {
+            if (!isAdmin) {
+                showToast('请先以管理员身份登录');
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            if (fileExtension !== 'xlsx' && fileExtension !== 'xls') {
+                showToast('请上传Excel文件（.xlsx或.xls格式）');
+                return;
+            }
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    // 验证文件内容是否有效
+                    if (!e.target.result) {
+                        throw new Error('文件内容为空');
+                    }
+                    
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+                        throw new Error('无法解析Excel文件，文件可能损坏');
+                    }
+                    
+                    // 处理所有工作表
+                    const newStockData = [];
+                    let totalValidCount = 0;
+                    
+                    // 遍历每个工作表
+                    workbook.SheetNames.forEach(warehouseName => {
+                        const worksheet = workbook.Sheets[warehouseName];
+                        if (!worksheet) return;
+                        
+                        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+                        
+                        // 检查列数是否足够
+                        if (range.e.c < 9) {
+                            showToast(`工作表 "${warehouseName}" 列数不足，至少需要10列`);
+                            return;
+                        }
+                        
+                        let sheetValidCount = 0;
+                        
+                        // 从第二行开始读取数据（跳过表头）
+                        for (let row = range.s.r + 1; row <= range.e.r; row++) {
+                            // 获取单元格数据（B列=1, C列=2, J列=9）
+                            const codeCell = worksheet[XLSX.utils.encode_cell({r: row, c: 1})];
+                            const colorCell = worksheet[XLSX.utils.encode_cell({r: row, c: 2})];
+                            const quantityCell = worksheet[XLSX.utils.encode_cell({r: row, c: 9})];
+                            
+                            // 处理单元格数据
+                            let code = codeCell ? (codeCell.v || '').toString().trim() : '';
+                            const color = colorCell ? (colorCell.v || '').toString().trim() : '';
+                            const quantity = quantityCell ? parseInt(quantityCell.v || 0) : 0;
+                            
+                            // 去除泰语前缀
+                            code = removeThaiPrefix(code);
+                            
+                            if (code) {
+                                newStockData.push({
+                                    code: code,
+                                    color: color,
+                                    warehouse: warehouseName,
+                                    quantity: isNaN(quantity) ? 0 : quantity
+                                });
+                                sheetValidCount++;
+                                totalValidCount++;
+                            }
+                        }
+                    });
+                    
+                    if (totalValidCount === 0) {
+                        showToast('未找到有效的库存数据，请检查文件格式');
+                        return;
+                    }
+                    
+                    // 保存数据
+                    const updateTime = new Date().toISOString();
+                    
+                    // 同时更新本地缓存和Firebase
+                    localStorage.setItem('cachedStockData', JSON.stringify(newStockData));
+                    localStorage.setItem('cachedStockTime', updateTime);
+                    stockData = newStockData;
+                    updateLastUpdateTime(updateTime);
+                    
+                    // 如果在线，同步到Firebase
+                    if (!isOfflineMode && firebaseApp) {
+                        stockRef.set({
+                            stockData: newStockData,
+                            updateTime: updateTime
+                        }).then(() => {
+                            showToast(`成功更新 ${totalValidCount} 条库存记录（已同步到服务器）`);
+                        }).catch(error => {
+                            console.error('更新Firebase失败', error);
+                            showToast(`成功更新 ${totalValidCount} 条库存记录（仅保存在本地）`);
+                        });
+                    } else {
+                        showToast(`成功更新 ${totalValidCount} 条库存记录（离线模式）`);
+                    }
+                    
+                    // 重置文件输入
+                    document.getElementById('adminFileInput').value = '';
+                    
+                } catch (error) {
+                    console.error('文件处理失败:', error);
+                    showToast(`文件处理失败: ${error.message}`);
+                }
+            };
+            
+            reader.onerror = function() {
+                showToast('文件读取失败，请重试');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            console.error('文件上传处理出错:', error);
+            showToast(`文件处理出错: ${error.message}`);
+        }
+    }
+    
+    // 去除编号中的泰语前缀
+    function removeThaiPrefix(code) {
+        if (!code) return code;
+        const thaiRegex = /^[\u0E00-\u0E7F]+/;
+        return code.replace(thaiRegex, '').trim();
+    }
+    
+    // 更新上次更新时间显示
+    function updateLastUpdateTime(timestamp) {
+        const element = document.getElementById('last-update-time');
+        if (!element) return;
+        
+        if (!timestamp) {
+            element.textContent = '库存最后更新时间：从未更新';
+            return;
+        }
+        
+        const date = new Date(timestamp);
+        const formattedTime = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        element.textContent = `库存最后更新时间：${formattedTime}`;
+    }
+
+    // 切换模式
+    function switchMode(mode){
+        currentMode = mode;
+        document.getElementById('outbound-mode').classList.remove('active');
+        document.getElementById('inbound-mode').classList.remove('active');
+        document.getElementById('stock-mode').classList.remove('active');
+        document.getElementById(mode + '-mode').classList.add('active');
+        
+        document.getElementById('outbound-content').classList.remove('active');
+        document.getElementById('inbound-content').classList.remove('active');
+        document.getElementById('stock-content').classList.remove('active');
+        document.getElementById(mode + '-content').classList.add('active');
+        
+        // 控制公共内容区域显示
+        document.body.classList.toggle('stock-mode', mode === 'stock');
+        
+        saveData();
+    }
+    
+    // 处理规格选择变化
+    function handleSizeChange() {
+        const sizeSelect = document.getElementById('size');
+        const customSizeInput = document.getElementById('customSize');
+        
+        if (sizeSelect.value === 'custom') {
+            customSizeInput.style.display = 'block';
+        } else {
+            customSizeInput.style.display = 'none';
+        }
+    }
+    
+    // 添加瓷砖到列表
+    function addTile() {
+        const code = document.getElementById('code').value.trim();
+        const sizeSelect = document.getElementById('size');
+        const quantity = document.getElementById('quantity').value.trim();
+        const color = document.getElementById('color').value.trim();
+        
+        // 验证必填字段
+        if (!code) {
+            showToast('请输入瓷砖编号');
+            return;
+        }
+        
+        if (sizeSelect.value === '' || (sizeSelect.value === 'custom' && !document.getElementById('customSize').value.trim())) {
+            showToast('请选择或输入瓷砖规格');
+            return;
+        }
+        
+        if (!quantity || isNaN(quantity) || parseInt(quantity) <= 0) {
+            showToast('请输入有效的数量');
+            return;
+        }
+        
+        // 获取规格值
+        const size = sizeSelect.value === 'custom' 
+            ? document.getElementById('customSize').value.trim() 
+            : sizeSelect.value;
+        
+        // 添加到列表
+        tiles.push({
+            id: tileIndex++,
+            code: code,
+            size: size,
+            quantity: parseInt(quantity),
+            color: color
+        });
+        
+        // 更新显示
+        updateTilesList();
+        
+        // 清空输入
+        document.getElementById('code').value = '';
+        document.getElementById('quantity').value = '';
+        document.getElementById('color').value = '';
+        
+        saveData();
+        showToast('已添加到列表');
+    }
+    
+    // 更新瓷砖列表显示
+    function updateTilesList() {
+        const listElement = document.getElementById('tiles-list');
+        
+        if (tiles.length === 0) {
+            listElement.innerHTML = '尚未添加瓷砖';
+            return;
+        }
+        
+        let html = '';
+        tiles.forEach(tile => {
+            html += `
+                <div class="tile-item">
+                    <strong>${tile.code}</strong> ${tile.size} ${tile.color ? '(' + tile.color + ')' : ''}
+                    <br>数量: ${tile.quantity}
+                    <button class="gray" style="width: auto; padding: 3px 8px; font-size: 12px; margin-top: 5px;" 
+                            onclick="removeTile(${tile.id})">删除</button>
+                </div>
+            `;
+        });
+        
+        listElement.innerHTML = html;
+    }
+    
+    // 从列表中移除瓷砖
+    function removeTile(id) {
+        tiles = tiles.filter(tile => tile.id !== id);
+        updateTilesList();
+        saveData();
+        showToast('已从列表中移除');
+    }
+    
+    // 清空列表
+    function clearAll() {
+        if (confirm('确定要清空所有已添加的瓷砖吗？')) {
+            tiles = [];
+            updateTilesList();
+            saveData();
+            showToast('已清空列表');
+        }
+    }
+    
+    // 生成计划
+    function generatePlan() {
+        if (tiles.length === 0) {
+            showToast('请先添加瓷砖');
+            return;
+        }
+        
+        let result = '';
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+        
+        if (currentMode === 'outbound') {
+            // 出货计划
+            const customer = document.getElementById('customer').value.trim() || '未指定客户';
+            const payment = document.getElementById('payment').value === 'yes' ? '已付款' : 
+                           (document.getElementById('payment').value === 'no' ? '未付款' : '未选择');
+            const unit = document.getElementById('unit').value.trim() || '未指定';
+            
+            result += `出货计划 - ${dateStr}\n`;
+            result += `客户: ${customer}\n`;
+            result += `付款状态: ${payment}\n`;
+            result += `单位/车牌: ${unit}\n\n`;
+            result += `瓷砖清单:\n`;
+            
+            tiles.forEach((tile, index) => {
+                result += `${index + 1}. ${tile.code} ${tile.size} ${tile.color ? '(' + tile.color + ')' : ''} - ${tile.quantity}箱\n`;
+                
+                // 检查库存
+                const stockItems = stockData.filter(item => 
+                    item.code.toLowerCase().includes(tile.code.toLowerCase())
+                );
+                
+                if (stockItems.length > 0) {
+                    result += `   库存: ${stockItems.reduce((sum, item) => sum + item.quantity, 0)}箱 `;
+                    result += `(分布: ${stockItems.map(item => `${item.warehouse}: ${item.quantity}箱`).join('; ')})\n`;
+                } else {
+                    result += `   库存: 未找到该编号的库存记录\n`;
+                }
+            });
+        } else if (currentMode === 'inbound') {
+            // 海运入库
+            const containerNo = document.getElementById('containerNo').value.trim() || '未指定';
+            const warehouse = document.getElementById('warehouse').value || '未选择';
+            
+            result += `海运入库计划 - ${dateStr}\n`;
+            result += `柜号: ${containerNo}\n`;
+            result += `入库仓库: ${warehouse}\n\n`;
+            result += `瓷砖清单:\n`;
+            
+            tiles.forEach((tile, index) => {
+                result += `${index + 1}. ${tile.code} ${tile.size} ${tile.color ? '(' + tile.color + ')' : ''} - ${tile.quantity}箱\n`;
+            });
+        }
+        
+        document.getElementById('result').textContent = result;
+        showToast('计划已生成');
+        saveData();
+    }
+    
+    // 复制结果
+    function copyResult() {
+        const result = document.getElementById('result').textContent;
+        if (!result) {
+            showToast('没有可复制的内容');
+            return;
+        }
+        
+        navigator.clipboard.writeText(result).then(() => {
+            showToast('内容已复制到剪贴板');
+        }).catch(err => {
+            console.error('复制失败:', err);
+            showToast('复制失败，请手动复制');
+        });
+    }
+    
+    // 搜索库存 - 修改为表格显示
+    function searchStock() {
+        const code = document.getElementById('stockCode').value.trim().toLowerCase();
+        if (!code) {
+            showToast('请输入要查询的瓷砖编号');
+            return;
+        }
+        
+        // 模糊搜索
+        const results = stockData.filter(item => 
+            item.code.toLowerCase().includes(code)
+        );
+        
+        const tableElement = document.getElementById('stock-result-table');
+        const bodyElement = document.getElementById('stock-result-body');
+        const messageElement = document.getElementById('stock-result-message');
+        
+        if (results.length === 0) {
+            // 没有结果时显示消息
+            tableElement.style.display = 'none';
+            messageElement.textContent = `未找到包含"${code}"的库存记录`;
+            messageElement.style.display = 'block';
+            return;
+        }
+        
+        // 有结果时显示表格
+        messageElement.style.display = 'none';
+        tableElement.style.display = 'table';
+        
+        // 清空表格内容
+        bodyElement.innerHTML = '';
+        
+        // 填充表格数据
+        results.forEach((item, index) => {
+            const row = document.createElement('tr');
+            
+            // 交替行背景色，提高可读性
+            if (index % 2 === 1) {
+                row.style.backgroundColor = '#f9f9f9';
+            }
+            
+            row.innerHTML = `
+                <td>${item.code}</td>
+                <td>${item.color || '-'}</td>
+                <td>${item.quantity}</td>
+                <td>${item.warehouse}</td>
+            `;
+            
+            bodyElement.appendChild(row);
+        });
+    }
+    
+    // 恢复保存的数据
+    function restoreSavedData() {
+        try {
+            const saved = localStorage.getItem('tilePlanData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                tiles = data.tiles || [];
+                currentMode = data.currentMode || 'outbound';
+                
+                // 恢复表单数据
+                document.getElementById('customer').value = data.customer || '';
+                document.getElementById('payment').value = data.payment || '';
+                document.getElementById('unit').value = data.unit || '';
+                document.getElementById('containerNo').value = data.containerNo || '';
+                document.getElementById('warehouse').value = data.warehouse || '';
+                document.getElementById('result').textContent = data.result || '';
+                document.getElementById('customSize').value = data.customSize || '';
+                
+                updateTilesList();
+                switchMode(currentMode);
+                handleSizeChange();
+            }
+        } catch (e) {
+            console.error('解析计划数据失败', e);
+            localStorage.removeItem('tilePlanData');
+        }
+    }
+    
+    // 保存数据到本地存储
+    function saveData() {
+        try {
+            const data = {
+                tiles: tiles,
+                currentMode: currentMode,
+                customer: document.getElementById('customer').value,
+                payment: document.getElementById('payment').value,
+                unit: document.getElementById('unit').value,
+                containerNo: document.getElementById('containerNo').value,
+                warehouse: document.getElementById('warehouse').value,
+                result: document.getElementById('result').textContent,
+                customSize: document.getElementById('customSize').value
+            };
+            
+            localStorage.setItem('tilePlanData', JSON.stringify(data));
+        } catch (e) {
+            console.error('保存数据失败', e);
+            showToast('数据保存失败');
+        }
+    }
+    
+    // 显示提示消息
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        if (!toast) return;
+        
+        toast.textContent = message;
+        toast.style.display = 'block';
+        
+        clearTimeout(window.toastTimeout);
+        window.toastTimeout = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 3000);
+    }
+</script>
+</body>
+</html>
+    
