@@ -230,7 +230,7 @@ th{background:var(--primary);color:#fff;position:sticky;top:0}
   }
 
   // main search
-  /* ---------- 替换起点： main search ---------- */
+/* ---------- 替换起点： main search（完整替换） ---------- */
 
 const searchInput = document.getElementById('searchCode');
 const searchBtn = document.getElementById('searchBtn');
@@ -239,24 +239,40 @@ const tbody = document.getElementById('mainTbody');
 const msg = document.getElementById('mainMsg');
 
 function renderResults(key){
-  tbody.innerHTML = ''; 
-  table.style.display = 'none'; 
+  // 1) 抑制 MutationObserver（避免 observer 并发插入 img-cell 导致重复 DOM 操作）
+  window._suppressTableObserver = true;
+
+  // 2) 先清空表格显示区，隐藏表格，清空提示
+  tbody.innerHTML = '';
+  table.style.display = 'none';
   msg.textContent = '';
 
-  if(!key){ msg.textContent = '请输入编号关键词'; return; }
+  // 3) 基本校验
+  if(!key){
+    window._suppressTableObserver = false; // 立即解除抑制
+    msg.textContent = '请输入编号关键词';
+    return;
+  }
 
+  // 4) 查找匹配项（不改变原数据），并判断是否为空
   const res = stockData.filter(i => i.code && String(i.code).toLowerCase().includes(key));
-  if(!res.length){ msg.textContent = '未找到结果'; return; }
+  if(!res.length){
+    window._suppressTableObserver = false; // 立即解除抑制
+    msg.textContent = '未找到结果';
+    return;
+  }
 
-  const MAX_SHOW = 200;
+  // 5) 限制显示条数以避免一次性渲染过多
+  const MAX_SHOW = 100; // 可根据机器性能调整（建议 50~300 之间）
   const count = Math.min(res.length, MAX_SHOW);
 
+  // 6) 批量构造行（每行已包含 img-cell 占位，避免 observer 再次插入）
   const frag = document.createDocumentFragment();
   for(let i=0;i<count;i++){
     const r = res[i];
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="img-cell">&#8203;</td>
+      <td class="img-cell" style="width:80px;min-width:80px;max-width:80px;vertical-align:middle;">&#8203;</td>
       <td>${r.code}</td>
       <td>${r.color || '-'}</td>
       <td>${qtyBadge(r.quantity)}</td>
@@ -267,43 +283,60 @@ function renderResults(key){
   tbody.appendChild(frag);
   table.style.display = 'table';
 
+  // 7) 分批加载图片，减轻主线程与网络并发压力
   const rows = Array.from(tbody.querySelectorAll('tr'));
   let idx = 0;
-  const BATCH = 20;
-
+  const BATCH = 10; // 每批处理多少行（推荐 5~30）
   function loadBatch(){
     const end = Math.min(idx + BATCH, rows.length);
     for(let j=idx;j<end;j++){
       const row = rows[j];
       const imgTd = row.querySelector('.img-cell');
       const codeCell = row.children[1];
-      const codeText = codeCell ? codeCell.textContent.trim() : '';
+      const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
       const code = extractCodeFromText(codeText);
 
+      // 调用已有的 loadImgIntoCell（确保该函数存在并支持 lazy）
       loadImgIntoCell(imgTd, code);
+      // Reinforce lazy loading & fixed dimensions to reduce layout shift
       const img = imgTd.querySelector('img');
-      if(img) img.loading = 'lazy';
+      if(img){
+        img.loading = 'lazy';
+        img.width = 80;
+        img.height = 56;
+        img.style.display = 'block';
+      }
     }
     idx = end;
-    if(idx < rows.length) setTimeout(loadBatch, 80);
+    if(idx < rows.length){
+      // 微延迟再加载下一批，避免阻塞 UI
+      setTimeout(loadBatch, 120); // 120 ms 延迟，可根据体验微调
+    } else {
+      // 所有批次加载完毕后，稍等片刻再恢复 observer（确保不会与最后一批并发冲突）
+      setTimeout(()=>{ window._suppressTableObserver = false; }, 80);
+    }
   }
   loadBatch();
 
+  // 8) 如果匹配很多，提示用户（并非错误）
   if(res.length > MAX_SHOW){
     msg.textContent = `匹配到 ${res.length} 条，仅显示前 ${MAX_SHOW} 条，请缩小搜索范围以查看全部。`;
   }
 }
 
+// 简单防抖（避免连续快速输入触发重复渲染）
 function debounce(fn, wait){
   let t = null;
   return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), wait); };
 }
 const debouncedRender = debounce(()=> renderResults(searchInput.value.trim().toLowerCase()), 250);
 
+// 绑定输入防抖与按钮点击
 searchInput.addEventListener('input', debouncedRender);
 searchBtn.addEventListener('click', ()=> renderResults(searchInput.value.trim().toLowerCase()));
 
 /* ---------- 替换结束 ---------- */
+
 
   document.getElementById('refreshBtn').addEventListener('click', loadStockData);
 
@@ -577,26 +610,29 @@ document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideImageM
         }
       });
       // observe future additions
-      const obs = new MutationObserver(muts=>{
-        muts.forEach(mut=>{
-          mut.addedNodes && mut.addedNodes.forEach(node=>{
-            if(node && node.nodeType===1 && node.tagName.toLowerCase()==='tr'){
-              if(!node.querySelector('.img-cell')){
-                const imgTd = document.createElement('td');
-                imgTd.className = 'img-cell';
-                imgTd.innerHTML = '&#8203;';
-                node.insertBefore(imgTd, node.firstChild);
-                const codeCell = node.children[1];
-                const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
-                const code = extractCodeFromText(codeText);
-                loadImgIntoCell(imgTd, code);
-              }
-            }
-          });
-        });
-      });
-      obs.observe(tbody, { childList:true });
+      // --- observer with global suppress flag support ---
+const obs = new MutationObserver(muts=>{
+  // 如果外部设置了抑制标志，则不做任何处理（避免在批量渲染时重复操作）
+  if(window._suppressTableObserver) return;
+  muts.forEach(mut=>{
+    mut.addedNodes && mut.addedNodes.forEach(node=>{
+      if(node && node.nodeType===1 && node.tagName.toLowerCase()==='tr'){
+        if(!node.querySelector('.img-cell')){
+          const imgTd = document.createElement('td');
+          imgTd.className = 'img-cell';
+          imgTd.innerHTML = '&#8203;';
+          node.insertBefore(imgTd, node.firstChild);
+          const codeCell = node.children[1];
+          const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
+          const code = extractCodeFromText(codeText);
+          loadImgIntoCell(imgTd, code);
+        }
+      }
     });
+  });
+});
+obs.observe(tbody, { childList:true });
+window._tableObserver = obs; // store ref (optional)
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', processTables);
