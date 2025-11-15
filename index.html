@@ -66,6 +66,8 @@ button.small{padding:6px 10px;border-radius:8px;font-size:14px}
 .table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;margin-top:10px;border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left}
+.img-cell{width:80px;min-width:80px;max-width:80px;text-align:center}
+.img-cell img{display:block;width:80px;height:56px;object-fit:cover;border-radius:6px}
 th{background:var(--primary);color:#fff;position:sticky;top:0}
 .item{background:#fbfdff;padding:10px;border-radius:10px;margin-bottom:10px;border:1px solid #eef5ff}
 .mini-row{display:flex;gap:8px;align-items:center}
@@ -518,24 +520,36 @@ document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideImageM
     return tokens[0] || '';
   }
   function loadImgIntoCell(cell, code){
-    try{
-      if(!cell) return;
-      // clear placeholder
-      cell.innerHTML = '';
-      if(!code) { cell.innerHTML = ''; return; }
-      var img = document.createElement('img');
-      img.alt = code;
-      img.style.width='80px'; img.style.height='56px'; img.style.objectFit='cover'; img.style.borderRadius='6px'; img.style.cursor='zoom-in';
-      img.src = IMG_BASE + encodeURIComponent(code) + '.jpg';
-      img.onerror = function(){
-        if(this._t === undefined){ this._t = 1; this.src = IMG_BASE + encodeURIComponent(code) + '.jpeg'; }
-        else if(this._t === 1){ this._t = 2; this.src = IMG_BASE + encodeURIComponent(code) + '.png'; }
-        else { this.src = IMG_BASE + 'wutu.gif'; }
-      };
-      img.addEventListener('click', function(e){ e.stopPropagation(); showImageModal(img.src); });
-      cell.appendChild(img);
-    }catch(e){ console.warn(e); }
-  }
+  try{
+    if(!cell) return;
+    cell.innerHTML = '';
+    if(!code){ cell.innerHTML = ''; return; }
+
+    var img = document.createElement('img');
+    img.alt = code;
+    // 设置属性以避免布局跳动
+    img.width = 80;
+    img.height = 56;
+    img.style.objectFit = 'cover';
+    img.style.borderRadius = '6px';
+    img.style.cursor = 'zoom-in';
+    img.style.display = 'block';
+    img.loading = 'lazy';
+
+    // 初始尝试 jpg
+    img.src = IMG_BASE + encodeURIComponent(code) + '.jpg';
+    img.onerror = function(){
+      if(this._t === undefined){ this._t = 1; this.src = IMG_BASE + encodeURIComponent(code) + '.jpeg'; }
+      else if(this._t === 1){ this._t = 2; this.src = IMG_BASE + encodeURIComponent(code) + '.png'; }
+      else { this.src = IMG_BASE + 'wutu.gif'; }
+    };
+    img.addEventListener('click', function(e){ e.stopPropagation(); showImageModal(img.src); });
+    // Try decode for smoother paint (if supported)
+    cell.appendChild(img);
+    if(img.decode) img.decode().catch(()=>{});
+  }catch(e){ console.warn(e); }
+}
+
 
   // Process tables initially and for dynamic rows
   function processTables(){
