@@ -228,20 +228,81 @@ th{background:var(--primary);color:#fff;position:sticky;top:0}
   }
 
   // main search
-  document.getElementById('searchBtn').addEventListener('click', ()=>{
-    const key = document.getElementById('searchCode').value.trim().toLowerCase();
-    const table = document.getElementById('mainTable'), tbody = document.getElementById('mainTbody'), msg = document.getElementById('mainMsg');
-    tbody.innerHTML=''; table.style.display='none'; msg.textContent='';
-    if(!key){ msg.textContent='请输入编号关键词'; return; }
-    const res = stockData.filter(i => i.code && String(i.code).toLowerCase().includes(key));
-    if(!res.length){ msg.textContent='未找到结果'; return; }
-    res.forEach(r=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.code}</td><td>${r.color||'-'}</td><td>${qtyBadge(r.quantity)}</td><td>${r.warehouse||''}</td>`;
-      tbody.appendChild(tr);
-    });
-    table.style.display='table';
-  });
+  /* ---------- 替换起点： main search ---------- */
+
+const searchInput = document.getElementById('searchCode');
+const searchBtn = document.getElementById('searchBtn');
+const table = document.getElementById('mainTable');
+const tbody = document.getElementById('mainTbody');
+const msg = document.getElementById('mainMsg');
+
+function renderResults(key){
+  tbody.innerHTML = ''; 
+  table.style.display = 'none'; 
+  msg.textContent = '';
+
+  if(!key){ msg.textContent = '请输入编号关键词'; return; }
+
+  const res = stockData.filter(i => i.code && String(i.code).toLowerCase().includes(key));
+  if(!res.length){ msg.textContent = '未找到结果'; return; }
+
+  const MAX_SHOW = 200;
+  const count = Math.min(res.length, MAX_SHOW);
+
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<count;i++){
+    const r = res[i];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="img-cell">&#8203;</td>
+      <td>${r.code}</td>
+      <td>${r.color || '-'}</td>
+      <td>${qtyBadge(r.quantity)}</td>
+      <td>${r.warehouse || ''}</td>
+    `;
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+  table.style.display = 'table';
+
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  let idx = 0;
+  const BATCH = 20;
+
+  function loadBatch(){
+    const end = Math.min(idx + BATCH, rows.length);
+    for(let j=idx;j<end;j++){
+      const row = rows[j];
+      const imgTd = row.querySelector('.img-cell');
+      const codeCell = row.children[1];
+      const codeText = codeCell ? codeCell.textContent.trim() : '';
+      const code = extractCodeFromText(codeText);
+
+      loadImgIntoCell(imgTd, code);
+      const img = imgTd.querySelector('img');
+      if(img) img.loading = 'lazy';
+    }
+    idx = end;
+    if(idx < rows.length) setTimeout(loadBatch, 80);
+  }
+  loadBatch();
+
+  if(res.length > MAX_SHOW){
+    msg.textContent = `匹配到 ${res.length} 条，仅显示前 ${MAX_SHOW} 条，请缩小搜索范围以查看全部。`;
+  }
+}
+
+function debounce(fn, wait){
+  let t = null;
+  return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), wait); };
+}
+const debouncedRender = debounce(()=> renderResults(searchInput.value.trim().toLowerCase()), 250);
+
+searchInput.addEventListener('input', debouncedRender);
+searchBtn.addEventListener('click', ()=> renderResults(searchInput.value.trim().toLowerCase()));
+
+/* ---------- 替换结束 ---------- */
+
   document.getElementById('refreshBtn').addEventListener('click', loadStockData);
 
   // 出货计划: add item with aligned search button
