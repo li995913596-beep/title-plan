@@ -50,18 +50,19 @@ section{
 }
 .active{display:block;}
 
-h3{margin:10px 0;font-size:18px;}
-h4{margin:10px 0 5px 0;}
+h3{margin:10px 0;}
+h4{margin:10px 0 5px;}
 
 input,select{
   width:100%;
   padding:10px;
-  border:1px solid #ccc;
   border-radius:6px;
-  margin:5px 0;
+  border:1px solid #ccc;
+  margin:6px 0;
   box-sizing:border-box;
 }
 
+/* 表格 */
 table{
   width:100%;
   border-collapse:collapse;
@@ -69,24 +70,28 @@ table{
   margin-top:10px;
 }
 
-th,td{
+th{
+  background:#b30000;
+  color:#fff;
+  padding:8px;
+  font-size:13px;
+}
+
+td{
   padding:8px;
   border-bottom:1px solid #eee;
   text-align:center;
   font-size:13px;
 }
 
-th{
-  background:#b30000;
-  color:#fff;
-}
-
+/* 图片 */
 img{
-  width:70px;
+  width:80px;
   border-radius:6px;
   cursor:pointer;
 }
 
+/* 图片全屏 */
 .modal{
   display:none;
   position:fixed;
@@ -99,6 +104,7 @@ img{
   align-items:center;
   z-index:9999;
 }
+
 .modal img{
   width:100vw;
   height:auto;
@@ -106,6 +112,7 @@ img{
   object-fit:contain;
 }
 
+/* 卡片 */
 .card{
   background:#fff;
   padding:10px;
@@ -124,29 +131,24 @@ button.small{
 
 /* 手机优化 */
 @media(max-width:768px){
+
   header button{
     flex:1 1 45%;
+    font-size:12px;
   }
-  table thead{display:none;}
-  table,tr,td{
-    display:block;
-    width:100%;
+
+  th,td{
+    font-size:12px;
+    padding:6px;
   }
-  tr{
-    background:#fff;
-    margin-bottom:10px;
-    padding:8px;
-    border-radius:8px;
-  }
-  td{
-    text-align:left;
-    border:none;
+
+  img{
+    width:110px;
   }
 }
 </style>
 </head>
 <body>
-
 <header>
 <button onclick="showPage('query')">库存查询 Query</button>
 <button onclick="adminOnly('out')">出库 Outbound</button>
@@ -156,65 +158,83 @@ button.small{
 <button onclick="toggleAdmin()">管理员 Admin</button>
 </header>
 
+<!-- 查询 -->
 <section id="query" class="active">
 <h3>库存查询 Inventory Query</h3>
 <input id="searchInput" placeholder="输入编号 Enter Code" oninput="searchStock()">
 <table>
 <thead>
 <tr>
-<th>图片</th><th>编号</th><th>规格</th><th>色号</th><th>数量</th><th>仓库</th>
+<th>图片 Image</th>
+<th>编号 Code</th>
+<th>规格 Size</th>
+<th>色号 Color</th>
+<th>数量 Quantity</th>
+<th>仓库 Warehouse</th>
 </tr>
 </thead>
 <tbody id="resultBody"></tbody>
 </table>
 </section>
 
+<!-- 出库 -->
 <section id="out">
 <h3>出库管理 Outbound Management</h3>
-<input id="outSearch" placeholder="搜索编号" oninput="searchOutStock()">
+<input id="outSearch" placeholder="搜索编号 Search Code" oninput="searchOutStock()">
 <div id="outResults"></div>
 </section>
 
+<!-- 入库 -->
 <section id="in">
 <h3>入库管理 Inbound Management</h3>
-<h4>搜索已有型号</h4>
-<input id="inSearch" oninput="searchInStock()">
+
+<h4>搜索已有型号 Search Existing</h4>
+<input id="inSearch" placeholder="搜索编号 Search Code" oninput="searchInStock()">
 <div id="inResults"></div>
 
 <hr>
 
-<h4>新增型号</h4>
-<input id="newCode" placeholder="编号">
-<input id="newSize" placeholder="规格">
-<input id="newColor" placeholder="色号">
+<h4>新增型号 Add New Item</h4>
+<input id="newCode" placeholder="编号 Code">
+<input id="newSize" placeholder="规格 Size">
+<input id="newColor" placeholder="色号 Color">
 <select id="newWarehouse">
 <option>K38</option>
 <option>K39</option>
 <option>1号仓库</option>
 </select>
-<input id="newQty" type="number" placeholder="数量">
-<button class="small" onclick="createNewStock()">确认新增</button>
+<input id="newQty" type="number" placeholder="数量 Quantity">
+<button class="small" onclick="createNewStock()">确认新增 Confirm</button>
 </section>
 
+<!-- 日志 -->
 <section id="log">
 <h3>操作日志 Operation Logs</h3>
-<button class="small" onclick="downloadLogs()">下载CSV</button>
+<button class="small" onclick="downloadLogs()">下载CSV Download</button>
 <table>
 <thead>
 <tr>
-<th>时间</th><th>类型</th><th>编号</th><th>规格</th>
-<th>色号</th><th>数量</th><th>仓库</th>
-<th>客户</th><th>付款</th><th>操作人</th>
+<th>时间 Time</th>
+<th>类型 Type</th>
+<th>编号 Code</th>
+<th>规格 Size</th>
+<th>色号 Color</th>
+<th>数量 Qty</th>
+<th>仓库 Warehouse</th>
+<th>客户 Customer</th>
+<th>付款 Paid</th>
+<th>操作人 Operator</th>
 </tr>
 </thead>
 <tbody id="logBody"></tbody>
 </table>
 </section>
 
+<!-- 上传 -->
 <section id="upload">
 <h3>库存上传 Upload Inventory</h3>
 <input type="file" id="excelFile">
-<button class="small" onclick="uploadExcel()">上传</button>
+<button class="small" onclick="uploadExcel()">上传 Upload</button>
 </section>
 
 <div class="modal" id="imgModal">
