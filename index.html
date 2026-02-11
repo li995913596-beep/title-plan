@@ -23,91 +23,125 @@ const db = firebase.database();
 body{
   margin:0;
   font-family:"Segoe UI","Microsoft YaHei",sans-serif;
-  background:linear-gradient(135deg,#fff5f5,#f6f7fb);
+  background:#f4f6fa;
 }
+
 header{
-  background:linear-gradient(90deg,#b30000,#d10000);
-  padding:18px;
+  background:#b30000;
+  padding:12px;
   display:flex;
   flex-wrap:wrap;
-  gap:12px;
-  box-shadow:0 6px 20px rgba(0,0,0,0.2);
+  gap:8px;
+  justify-content:center;
 }
+
 header button{
-  background:linear-gradient(135deg,#d4af37,#f6c453);
+  background:#d4af37;
   border:none;
-  padding:8px 18px;
-  border-radius:25px;
+  padding:8px 12px;
+  border-radius:18px;
+  font-size:13px;
   cursor:pointer;
 }
-section{display:none;padding:25px;}
+
+section{
+  display:none;
+  padding:15px;
+}
 .active{display:block;}
 
-h3{margin-bottom:15px;}
+h3{margin:10px 0;font-size:18px;}
+h4{margin:10px 0 5px 0;}
 
 input,select{
-  padding:8px;
-  border-radius:8px;
-  border:1px solid #ddd;
-  margin:5px 0;
   width:100%;
+  padding:10px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  margin:5px 0;
+  box-sizing:border-box;
 }
 
 table{
   width:100%;
   border-collapse:collapse;
   background:#fff;
-  border-radius:14px;
-  overflow:hidden;
-  box-shadow:0 8px 25px rgba(0,0,0,0.05);
+  margin-top:10px;
 }
+
+th,td{
+  padding:8px;
+  border-bottom:1px solid #eee;
+  text-align:center;
+  font-size:13px;
+}
+
 th{
   background:#b30000;
   color:#fff;
-  padding:10px;
 }
-td{
-  padding:10px;
-  border-bottom:1px solid #eee;
-  text-align:center;
-}
-tbody tr:hover{background:#fff5f5;}
 
 img{
-  width:80px;
-  border-radius:10px;
+  width:70px;
+  border-radius:6px;
   cursor:pointer;
 }
 
 .modal{
   display:none;
   position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.95);
+  top:0;
+  left:0;
+  width:100vw;
+  height:100vh;
+  background:#000;
   justify-content:center;
   align-items:center;
   z-index:9999;
 }
 .modal img{
-  max-width:95vw;
-  max-height:95vh;
+  width:100vw;
+  height:auto;
+  max-height:100vh;
   object-fit:contain;
-  border-radius:18px;
 }
 
 .card{
   background:#fff;
-  padding:15px;
-  border-radius:12px;
+  padding:10px;
   margin:10px 0;
-  box-shadow:0 6px 20px rgba(0,0,0,0.05);
+  border-radius:8px;
 }
+
 button.small{
   background:#b30000;
   color:#fff;
   border:none;
-  padding:6px 10px;
+  padding:6px 8px;
   border-radius:6px;
+  margin-top:5px;
+}
+
+/* 手机优化 */
+@media(max-width:768px){
+  header button{
+    flex:1 1 45%;
+  }
+  table thead{display:none;}
+  table,tr,td{
+    display:block;
+    width:100%;
+  }
+  tr{
+    background:#fff;
+    margin-bottom:10px;
+    padding:8px;
+    border-radius:8px;
+  }
+  td{
+    text-align:left;
+    border:none;
+  }
 }
 </style>
 </head>
@@ -122,87 +156,65 @@ button.small{
 <button onclick="toggleAdmin()">管理员 Admin</button>
 </header>
 
-<!-- 查询 -->
 <section id="query" class="active">
 <h3>库存查询 Inventory Query</h3>
-<div style="display:flex;gap:10px;">
-<input id="searchInput" placeholder="输入编号 Enter Code" oninput="searchStock()" style="flex:1;">
-<button class="small" onclick="refreshStock()">刷新 Refresh</button>
-</div>
-
+<input id="searchInput" placeholder="输入编号 Enter Code" oninput="searchStock()">
 <table>
 <thead>
 <tr>
-<th>图片 Image</th>
-<th>编号 Code</th>
-<th>规格 Size</th>
-<th>色号 Color</th>
-<th>数量 Quantity</th>
-<th>仓库 Warehouse</th>
+<th>图片</th><th>编号</th><th>规格</th><th>色号</th><th>数量</th><th>仓库</th>
 </tr>
 </thead>
 <tbody id="resultBody"></tbody>
 </table>
 </section>
 
-<!-- 出库 -->
 <section id="out">
 <h3>出库管理 Outbound Management</h3>
-<input id="outSearch" placeholder="搜索编号 Search Code" oninput="searchOutStock()">
+<input id="outSearch" placeholder="搜索编号" oninput="searchOutStock()">
 <div id="outResults"></div>
 </section>
 
-<!-- 入库 -->
 <section id="in">
 <h3>入库管理 Inbound Management</h3>
-
-<h4>搜索已有型号 Search Existing</h4>
-<input id="inSearch" placeholder="搜索编号 Search Code" oninput="searchInStock()">
+<h4>搜索已有型号</h4>
+<input id="inSearch" oninput="searchInStock()">
 <div id="inResults"></div>
 
 <hr>
 
-<h4>新增型号 Add New Item</h4>
-<input id="newCode" placeholder="编号 Code">
-<input id="newSize" placeholder="规格 Size">
-<input id="newColor" placeholder="色号 Color">
+<h4>新增型号</h4>
+<input id="newCode" placeholder="编号">
+<input id="newSize" placeholder="规格">
+<input id="newColor" placeholder="色号">
 <select id="newWarehouse">
 <option>K38</option>
 <option>K39</option>
 <option>1号仓库</option>
 </select>
-<input id="newQty" type="number" placeholder="数量 Quantity">
-<button class="small" onclick="createNewStock()">确认新增 Confirm</button>
+<input id="newQty" type="number" placeholder="数量">
+<button class="small" onclick="createNewStock()">确认新增</button>
 </section>
 
-<!-- 日志 -->
 <section id="log">
 <h3>操作日志 Operation Logs</h3>
-<button class="small" onclick="downloadLogs()">下载CSV Download</button>
+<button class="small" onclick="downloadLogs()">下载CSV</button>
 <table>
 <thead>
 <tr>
-<th>时间 Time</th>
-<th>类型 Type</th>
-<th>编号 Code</th>
-<th>规格 Size</th>
-<th>色号 Color</th>
-<th>数量 Qty</th>
-<th>仓库 Warehouse</th>
-<th>客户 Customer</th>
-<th>付款 Paid</th>
-<th>操作人 Operator</th>
+<th>时间</th><th>类型</th><th>编号</th><th>规格</th>
+<th>色号</th><th>数量</th><th>仓库</th>
+<th>客户</th><th>付款</th><th>操作人</th>
 </tr>
 </thead>
 <tbody id="logBody"></tbody>
 </table>
 </section>
 
-<!-- 上传 -->
 <section id="upload">
 <h3>库存上传 Upload Inventory</h3>
 <input type="file" id="excelFile">
-<button class="small" onclick="uploadExcel()">上传 Upload</button>
+<button class="small" onclick="uploadExcel()">上传</button>
 </section>
 
 <div class="modal" id="imgModal">
@@ -240,23 +252,28 @@ if(!str)return "";
 const m=str.match(/[A-Z0-9]+/i);
 return m?m[0]:str;
 }
+
 function extractSize(str){
 if(!str)return "";
 const m=str.match(/\d+x\d+/i);
 return m?m[0]:"";
 }
+
 function showImg(url){
 bigImg.src=url;
 imgModal.style.display="flex";
 }
+
 imgModal.onclick=()=>imgModal.style.display="none";
 
-/* 查询 */
+/* ================= 查询 ================= */
+
 async function searchStock(){
 const snap=await db.ref('stock').once('value');
 const val=snap.val();
 resultBody.innerHTML="";
 if(!val)return;
+
 const kw=searchInput.value.toLowerCase();
 
 Object.values(val).forEach(item=>{
@@ -268,7 +285,7 @@ const url=`https://raw.githubusercontent.com/li995913596-beep/title-plan/main/${
 
 resultBody.innerHTML+=`
 <tr>
-<td><img src="${url}" onclick="showImg('${url}')" 
+<td><img src="${url}" onclick="showImg('${url}')"
 onerror="this.src='https://raw.githubusercontent.com/li995913596-beep/title-plan/main/wutu.gif'"></td>
 <td>${code}</td>
 <td>${size}</td>
@@ -281,16 +298,14 @@ onerror="this.src='https://raw.githubusercontent.com/li995913596-beep/title-plan
 });
 }
 
-async function refreshStock(){
-await searchStock();
-}
+/* ================= 出库 ================= */
 
-/* 出库 */
 async function searchOutStock(){
 const snap=await db.ref('stock').once('value');
 const val=snap.val();
 outResults.innerHTML="";
 if(!val)return;
+
 const kw=outSearch.value.toLowerCase();
 
 Object.entries(val).forEach(([key,item])=>{
@@ -349,12 +364,14 @@ alert("出库成功");
 searchOutStock();
 }
 
-/* 入库搜索 */
+/* ================= 入库 ================= */
+
 async function searchInStock(){
 const snap=await db.ref('stock').once('value');
 const val=snap.val();
 inResults.innerHTML="";
 if(!val)return;
+
 const kw=inSearch.value.toLowerCase();
 
 Object.entries(val).forEach(([key,item])=>{
@@ -376,8 +393,8 @@ if(!qty||qty<=0)return;
 
 const snap=await db.ref('stock/'+key).once('value');
 const item=snap.val();
-item.warehouses[warehouse]+=qty;
 
+item.warehouses[warehouse]+=qty;
 await db.ref('stock/'+key).set(item);
 
 await db.ref('operationLogs/'+Date.now()).set({
@@ -395,7 +412,6 @@ alert("入库成功");
 searchInStock();
 }
 
-/* 新增型号 */
 async function createNewStock(){
 const code=newCode.value.trim();
 const size=newSize.value.trim();
@@ -419,7 +435,8 @@ await db.ref('stock/'+key).set(item);
 alert("新增成功");
 }
 
-/* 日志 */
+/* ================= 日志 ================= */
+
 async function loadLogs(){
 const snap=await db.ref('operationLogs').once('value');
 const val=snap.val();
@@ -442,7 +459,6 @@ logBody.innerHTML+=`
 });
 }
 
-/* 日志下载 */
 async function downloadLogs(){
 const snap=await db.ref('operationLogs').once('value');
 const val=snap.val();
@@ -461,7 +477,8 @@ link.download="库存日志.csv";
 link.click();
 }
 
-/* Excel上传 */
+/* ================= 上传 ================= */
+
 function uploadExcel(){
 const file=document.getElementById("excelFile").files[0];
 if(!file) return alert("请选择文件");
