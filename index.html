@@ -1,535 +1,634 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>库存管理系统 Inventory Management System</title>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<script>
-firebase.initializeApp({
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>瓷砖库存管理系统 - 最终版 v2</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+const firebaseConfig = {
   apiKey: "AIzaSyC65DEOgj4WeksRRVmw4ZTrNkCB83SoQpI",
   authDomain: "tile-management-system-f5db8.firebaseapp.com",
   databaseURL: "https://tile-management-system-f5db8-default-rtdb.firebaseio.com",
-  projectId: "tile-management-system-f5db8"
-});
-const db = firebase.database();
+  projectId: "tile-management-system-f5db8",
+  storageBucket: "tile-management-system-f5db8.appspot.com",
+  messagingSenderId: "925027091187",
+  appId: "1:925027091187:web:a2bb160b629f541abded86"
+};
+try {
+  const app = initializeApp(firebaseConfig);
+  const database = getDatabase(app);
+  const stockRef = ref(database, 'tileStock');
+  window.firebase = { app, database, ref, set, onValue, get, stockRef };
+  window.firebaseInitialized = true;
+} catch(e){ window.firebaseInitialized=false; window.firebaseError=e.message; }
 </script>
-
 <style>
-body{
-  margin:0;
-  font-family:"Segoe UI","Microsoft YaHei",sans-serif;
-  background:#f4f6fa;
+:root{
+  --primary:#007AFF;
+  --bg:#F8FAFC;
+  --card:#fff;
+  --radius:14px;
+  --shadow:0 6px 18px rgba(0,0,0,0.08);
+  --red:#ef4444;
+  --orange:#f59e0b;
+  --lightgreen:#10b981;
+  --green:#047857;
+  font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
 }
-
-header{
-  background:#b30000;
-  padding:12px;
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  justify-content:center;
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);padding:84px 12px 20px;-webkit-font-smoothing:antialiased;color:#111}
+.navbar{
+  position:fixed;top:0;left:0;right:0;height:72px;
+  backdrop-filter: blur(12px);
+  background:rgba(0,122,255,0.82);
+  display:flex;align-items:center;justify-content:space-between;padding:10px 12px;color:white;z-index:999;border-bottom:1px solid rgba(255,255,255,0.12);
 }
-
-header button{
-  background:#d4af37;
-  border:none;
-  padding:8px 12px;
-  border-radius:18px;
-  font-size:13px;
-  cursor:pointer;
-}
-
-section{
-  display:none;
-  padding:15px;
-}
-.active{display:block;}
-
-h3{margin:10px 0;}
-h4{margin:10px 0 5px;}
-
-input,select{
-  width:100%;
-  padding:10px;
-  border-radius:6px;
-  border:1px solid #ccc;
-  margin:6px 0;
-  box-sizing:border-box;
-}
-
-/* 表格 */
-table{
-  width:100%;
-  border-collapse:collapse;
-  background:#fff;
-  margin-top:10px;
-}
-
-th{
-  background:#b30000;
-  color:#fff;
-  padding:8px;
-  font-size:13px;
-}
-
-td{
-  padding:8px;
-  border-bottom:1px solid #eee;
-  text-align:center;
-  font-size:13px;
-}
-
-/* 图片 */
-img{
-  width:80px;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-/* 图片全屏 */
-.modal{
-  display:none;
-  position:fixed;
-  top:0;
-  left:0;
-  width:100vw;
-  height:100vh;
-  background:#000;
-  justify-content:center;
-  align-items:center;
-  z-index:9999;
-}
-
-.modal img{
-  width:100vw;
-  height:auto;
-  max-height:100vh;
-  object-fit:contain;
-}
-
-/* 卡片 */
-.card{
-  background:#fff;
-  padding:10px;
-  margin:10px 0;
-  border-radius:8px;
-}
-
-button.small{
-  background:#b30000;
-  color:#fff;
-  border:none;
-  padding:6px 8px;
-  border-radius:6px;
-  margin-top:5px;
-}
-
-/* 手机优化 */
-@media(max-width:768px){
-
-  header button{
-    flex:1 1 45%;
-    font-size:12px;
-  }
-
-  th,td{
-    font-size:12px;
-    padding:6px;
-  }
-
-  img{
-    width:110px;
-  }
-}
+.navbar .brand{display:flex;align-items:center;gap:10px}
+.navbar h1{font-size:17px;margin:0;font-weight:600}
+.nav-tabs{display:flex;gap:6px;align-items:center}
+.nav-tabs button{background:transparent;border:0;color:rgba(255,255,255,0.95);font-size:15px;padding:8px 10px;border-radius:10px;display:flex;gap:8px;align-items:center}
+.nav-tabs button .icon{font-size:17px}
+.nav-tabs button.active{background:rgba(255,255,255,0.12)}
+.container{max-width:980px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
+h3{color:var(--primary);margin:0 0 6px}
+.thai{color:#666;font-size:13px;margin-bottom:8px}
+.label-small{font-size:13px;color:#666;margin-bottom:6px}
+input,select,textarea,button{font-size:15px}
+input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6eef9}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button.primary{background:var(--primary);color:#fff;border:0;padding:10px;border-radius:10px;cursor:pointer;flex:1}
+button.ghost{background:#f6f9ff;border:1px solid #e6eef9;color:#111;padding:10px;border-radius:10px;cursor:pointer;flex:1}
+button.small{padding:6px 10px;border-radius:8px;font-size:14px}
+.table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;margin-top:10px;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left}
+th{background:var(--primary);color:#fff;position:sticky;top:0}
+.item{background:#fbfdff;padding:10px;border-radius:10px;margin-bottom:10px;border:1px solid #eef5ff}
+.mini-row{display:flex;gap:8px;align-items:center}
+.mini-row input{flex:1}
+.mini-row button{flex:0 0 auto}
+.mini-res{margin-top:8px}
+.qty-badge{display:inline-block;padding:4px 8px;border-radius:999px;color:#fff;font-weight:600;font-size:13px}
+.qty-red{background:var(--red)}
+.qty-orange{background:var(--orange);color:#fff}
+.qty-lightgreen{background:var(--lightgreen)}
+.qty-green{background:var(--green)}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.78);color:#fff;padding:10px 16px;border-radius:18px;display:none;z-index:2000}
+.admin-btn{position:fixed;right:14px;bottom:18px;background:transparent;border:0;z-index:1500}
+.admin-btn .gear{background:rgba(0,0,0,0.6);color:#fff;padding:10px;border-radius:10px}
+.modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:2000}
+.modal .card{width:92%;max-width:420px}
+.footer-note{color:#666;text-align:center;padding:18px 0;font-size:13px}
+@media(max-width:600px){body{padding:92px 12px 20px} .nav-tabs button{padding:6px 8px;font-size:14px} th,td{padding:8px;font-size:13px}}
 </style>
 </head>
 <body>
-<header>
-<button onclick="showPage('query')">库存查询 Query</button>
-<button onclick="adminOnly('out')">出库 Outbound</button>
-<button onclick="adminOnly('in')">入库 Inbound</button>
-<button onclick="adminOnly('log')">日志 Logs</button>
-<button onclick="adminOnly('upload')">上传 Upload</button>
-<button onclick="toggleAdmin()">管理员 Admin</button>
-</header>
-
-<!-- 查询 -->
-<section id="query" class="active">
-<h3>库存查询 Inventory Query</h3>
-<input id="searchInput" placeholder="输入编号 Enter Code" oninput="searchStock()">
-<table>
-<thead>
-<tr>
-<th>图片 Image</th>
-<th>编号 Code</th>
-<th>规格 Size</th>
-<th>色号 Color</th>
-<th>数量 Quantity</th>
-<th>仓库 Warehouse</th>
-</tr>
-</thead>
-<tbody id="resultBody"></tbody>
-</table>
-</section>
-
-<!-- 出库 -->
-<section id="out">
-<h3>出库管理 Outbound Management</h3>
-<input id="outSearch" placeholder="搜索编号 Search Code" oninput="searchOutStock()">
-<div id="outResults"></div>
-</section>
-
-<!-- 入库 -->
-<section id="in">
-<h3>入库管理 Inbound Management</h3>
-
-<h4>搜索已有型号 Search Existing</h4>
-<input id="inSearch" placeholder="搜索编号 Search Code" oninput="searchInStock()">
-<div id="inResults"></div>
-
-<hr>
-
-<h4>新增型号 Add New Item</h4>
-<input id="newCode" placeholder="编号 Code">
-<input id="newSize" placeholder="规格 Size">
-<input id="newColor" placeholder="色号 Color">
-<select id="newWarehouse">
-<option>K38</option>
-<option>K39</option>
-<option>1号仓库</option>
-</select>
-<input id="newQty" type="number" placeholder="数量 Quantity">
-<button class="small" onclick="createNewStock()">确认新增 Confirm</button>
-</section>
-
-<!-- 日志 -->
-<section id="log">
-<h3>操作日志 Operation Logs</h3>
-<button class="small" onclick="downloadLogs()">下载CSV Download</button>
-<table>
-<thead>
-<tr>
-<th>时间 Time</th>
-<th>类型 Type</th>
-<th>编号 Code</th>
-<th>规格 Size</th>
-<th>色号 Color</th>
-<th>数量 Qty</th>
-<th>仓库 Warehouse</th>
-<th>客户 Customer</th>
-<th>付款 Paid</th>
-<th>操作人 Operator</th>
-</tr>
-</thead>
-<tbody id="logBody"></tbody>
-</table>
-</section>
-
-<!-- 上传 -->
-<section id="upload">
-<h3>库存上传 Upload Inventory</h3>
-<input type="file" id="excelFile">
-<button class="small" onclick="uploadExcel()">上传 Upload</button>
-</section>
-
-<div class="modal" id="imgModal">
-<img id="bigImg">
+<div class="navbar" role="banner">
+  <div class="brand">
+    <h1>瓷砖库存管理系统</h1>
+  </div>
+  <div class="nav-tabs" role="tablist" aria-label="主导航">
+    <button class="tabbtn active" data-tab="tab-search"><span class="icon">📊</span><span>库存查询</span></button>
+    <button class="tabbtn" data-tab="tab-chuhuo"><span class="icon">📦</span><span>出货计划</span></button>
+    <button class="tabbtn" data-tab="tab-haiyun"><span class="icon">🚢</span><span>海运入库</span></button>
+  </div>
 </div>
+
+<div class="container">
+  <!-- 库存查询 -->
+  <div id="tab-search" class="card tab" role="tabpanel">
+    <h3>📊 库存查询</h3>
+    <div class="thai">(ตรวจสอบสต็อกสินค้า)</div>
+    <div class="label-small">瓷砖编号 (支持模糊搜索)</div>
+    <input id="searchCode" placeholder="输入编号关键词，例如 AB123">
+    <div class="controls">
+      <button class="primary" id="searchBtn">查询库存<br><span class="thai">(ตรวจสอบสต็อก)</span></button>
+      <button class="ghost" id="refreshBtn">刷新数据<br><span class="thai">(รีเฟรชข้อมูล)</span></button>
+    </div>
+    <div id="lastInfo" style="margin-top:8px;color:#666;font-size:13px">库存最后更新时间：加载中...</div>
+    <div class="table-wrap">
+      <table id="mainTable" style="display:none">
+        <thead><tr><th>图片</th><th>编号</th><th>色号</th><th>数量(箱)</th><th>仓库</th></tr></thead>
+        <tbody id="mainTbody"></tbody>
+      </table>
+      <div id="mainMsg" style="padding:12px;color:#888">请输入编号并点击查询</div>
+    </div>
+  </div>
+
+  <!-- 出货计划 -->
+  <div id="tab-chuhuo" class="card tab" style="display:none">
+    <h3>📦 出货计划</h3>
+    <div class="thai">(แผนการจัดส่งสินค้า)</div>
+    <label>日期</label><input id="ch_date" type="date">
+    <label>单位或车牌</label><input id="ch_vehicle" type="text">
+    <label>客户</label><input id="ch_customer" type="text">
+    <div id="ch_items"></div>
+    <div class="controls">
+      <button class="primary" id="ch_add">+ 添加货项<br><span class='thai'>(+ เพิ่มรายการสินค้า)</span></button>
+      <button class="ghost" id="ch_gen">生成文字<br><span class='thai'>(สร้างข้อความ)</span></button>
+      <button class="primary" id="ch_copy">复制<br><span class='thai'>(คัดลอก)</span></button>
+    </div>
+    <pre id="ch_result" style="margin-top:10px">（请先填写表单）</pre>
+  </div>
+
+  <!-- 海运入库 -->
+  <div id="tab-haiyun" class="card tab" style="display:none">
+    <h3>🚢 海运入库</h3>
+    <div class="thai">(นำเข้าสินค้าทางเรือ)</div>
+    <label>日期</label><input id="hy_date" type="date">
+    <label>柜号</label><input id="hy_container" type="text">
+    <label>入库仓库（手动输入）</label><input id="hy_warehouse" placeholder="例如：K38仓库">
+    <div id="hy_items"></div>
+    <div class="controls">
+      <button class="primary" id="hy_add">+ 添加货项<br><span class='thai'>(+ เพิ่มรายการสินค้า)</span></button>
+      <button class="ghost" id="hy_gen">生成文字<br><span class='thai'>(สร้างข้อความ)</span></button>
+      <button class="primary" id="hy_copy">复制<br><span class='thai'>(คัดลอก)</span></button>
+    </div>
+    <pre id="hy_result" style="margin-top:10px">（请先填写表单）</pre>
+  </div>
+
+  <!-- 管理员区域（底部小按钮触发） -->
+  <div id="admin_placeholder" style="height:18px"></div>
+
+  <div class="footer-note">仅限内部使用 | Designed by Kyson Li</div>
+</div>
+
+<!-- 管理员按钮 -->
+<button class="admin-btn" id="adminToggle" title="管理员登录">
+  <span class="gear">⚙️ 管理员登录</span>
+</button>
+
+<!-- 管理员弹窗 -->
+<div class="modal" id="adminModal" role="dialog" aria-modal="true">
+  <div class="card">
+    <h3>🔐 管理员功能</h3>
+    <div class="thai">(สำหรับผู้ดูแลระบบ)</div>
+    <label>管理员密码</label>
+    <input id="adminPw" type="password" placeholder="输入密码">
+    <div class="controls" style="margin-top:8px">
+      <button class="primary" id="adminLogin">登录<br><span class='thai'>(เข้าสู่ระบบ)</span></button>
+      <button class="ghost" id="adminClose">取消</button>
+    </div>
+    <div id="adminArea" style="display:none;margin-top:12px">
+      <div class="label-small">上传 Excel 文件（B列=编号，C列=色号，J列=数量）</div>
+      <input id="excelInput" type="file" accept=".xlsx,.xls">
+      <div class="controls" style="margin-top:8px">
+        <button class="secondary" id="btnSave">保存并写入 Firebase<br><span class='thai'>(บันทึกข้อมูล)</span></button>
+        <button class="ghost" id="btnPreview">预览数据</button>
+      </div>
+      <div id="previewBox" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
+(function(){
+  // Tabs
+  const tabButtons = document.querySelectorAll('.tabbtn');
+  tabButtons.forEach(b=>{
+    b.addEventListener('click', ()=> {
+      tabButtons.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelectorAll('.tab').forEach(t=>t.style.display='none');
+      const id = 'tab-' + b.dataset.tab?.split?.('-')?.pop?.() || b.dataset.tab;
+      // mapping: use dataset tab value directly (we set data-tab to tab-search etc.)
+      const target = b.dataset.tab;
+      document.getElementById(target).style.display='block';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
 
-let isAdmin=false;
-let operator="";
+  function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',2400); }
 
-/* 页面切换 */
-function showPage(id){
-document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
-document.getElementById(id).classList.add("active");
-if(id==="log") loadLogs();
+  // Stock data
+  let stockData = [];
+  async function loadStockData(){
+    if(!window.firebase){ showToast('Firebase 未初始化'); return; }
+    try{
+      const snap = await window.firebase.get(window.firebase.stockRef);
+      const val = snap.val();
+      if(val && val.stockData){ stockData = val.stockData; document.getElementById('lastInfo').textContent = '库存最后更新时间：' + (val.updateTime || new Date().toLocaleString()); showToast('已加载库存数据'); }
+      else { stockData = []; showToast('暂无库存数据'); }
+    }catch(e){ console.error(e); showToast('加载库存失败'); }
+  }
+
+  // render quantity with color
+  function qtyBadge(num){
+    const n = Number(num) || 0;
+    if(n <= 50) return `<span class="qty-badge qty-red">${n}</span>`;
+    if(n <= 200) return `<span class="qty-badge qty-orange">${n}</span>`;
+    if(n <= 500) return `<span class="qty-badge qty-lightgreen">${n}</span>`;
+    return `<span class="qty-badge qty-green">${n}</span>`;
+  }
+
+  // main search
+const searchInput = document.getElementById('searchCode');
+const searchBtn = document.getElementById('searchBtn');
+const table = document.getElementById('mainTable');
+const tbody = document.getElementById('mainTbody');
+const msg = document.getElementById('mainMsg');
+
+function renderResults(key){
+  window._suppressTableObserver = true;
+  tbody.innerHTML = '';
+  table.style.display = 'none';
+  msg.textContent = '';
+  if(!key){
+    window._suppressTableObserver = false;
+    msg.textContent = '请输入编号关键词';
+    return;
+  }
+  const res = stockData.filter(i => i.code && String(i.code).toLowerCase().includes(key));
+  if(!res.length){
+    window._suppressTableObserver = false;
+    msg.textContent = '未找到结果';
+    return;
+  }
+  const MAX_SHOW = 100;
+  const count = Math.min(res.length, MAX_SHOW);
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<count;i++){
+    const r = res[i];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="img-cell" style="width:80px;min-width:80px;max-width:80px;vertical-align:middle;">&#8203;</td>
+      <td>${r.code}</td>
+      <td>${r.color || '-'}</td>
+      <td>${qtyBadge(r.quantity)}</td>
+      <td>${r.warehouse || ''}</td>
+    `;
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+  table.style.display = 'table';
+
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  let idx = 0;
+  const BATCH = 10;
+  function loadBatch(){
+    const end = Math.min(idx + BATCH, rows.length);
+    for(let j=idx;j<end;j++){
+      const row = rows[j];
+      const imgTd = row.querySelector('.img-cell');
+      const codeCell = row.children[1];
+      const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
+      const code = (window.nsTileImageHelpers && window.nsTileImageHelpers.extractCodeFromText) ? window.nsTileImageHelpers.extractCodeFromText(codeText) : (typeof extractCodeFromText === 'function' ? extractCodeFromText(codeText) : codeText);
+      (window.nsTileImageHelpers && window.nsTileImageHelpers.loadImgIntoCell) ? window.nsTileImageHelpers.loadImgIntoCell(imgTd, code) : (typeof loadImgIntoCell === 'function' ? loadImgIntoCell(imgTd, code) : null);
+      const img = imgTd.querySelector('img');
+      if(img){
+        img.loading = 'lazy';
+        img.width = 80;
+        img.height = 56;
+        img.style.display = 'block';
+      }
+    }
+    idx = end;
+    if(idx < rows.length) setTimeout(loadBatch, 120);
+    else { setTimeout(()=>{ window._suppressTableObserver = false; }, 80); }
+  }
+  loadBatch();
+
+  if(res.length > MAX_SHOW){
+    msg.textContent = `匹配到 ${res.length} 条，仅显示前 ${MAX_SHOW} 条，请缩小搜索范围以查看全部。`;
+  }
 }
 
-function adminOnly(id){
-if(!isAdmin){alert("请先登录管理员");return;}
-showPage(id);
+function debounce(fn, wait){
+  let t = null;
+  return function(...args){ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), wait); };
 }
+const debouncedRender = debounce(()=> renderResults(searchInput.value.trim().toLowerCase()), 250);
+searchInput.addEventListener('input', debouncedRender);
+searchBtn.addEventListener('click', ()=> renderResults(searchInput.value.trim().toLowerCase()));
 
-function toggleAdmin(){
-if(isAdmin){isAdmin=false;alert("已退出");return;}
-const pwd=prompt("输入管理员密码");
-if(pwd!=="admin")return alert("密码错误");
-operator=prompt("输入操作人姓名")||"管理员";
-isAdmin=true;
-alert("管理员已登录");
-}
+document.getElementById('refreshBtn').addEventListener('click', loadStockData);
 
-/* 工具函数 */
-function extractCode(str){
-if(!str)return "";
-const m=str.match(/[A-Z0-9]+/i);
-return m?m[0]:str;
-}
 
-function extractSize(str){
-if(!str)return "";
-const m=str.match(/\d+x\d+/i);
-return m?m[0]:"";
-}
+  // 出货计划: add item with aligned search button
+  const chList = document.getElementById('ch_items');
+  function addChItem(v={}) {
+    const el = document.createElement('div'); el.className='item';
+    el.innerHTML = `
+      <div class="mini-row">
+        <div style="flex:1">
+          <label>ကုဒ်နိပတ်/编号</label>
+          <input class="ch-code" placeholder="输入编号">
+        </div>
+        <button class="small ch-search">查询库存</button>
+      </div>
+      <div class="mini-res"></div>
+      <label>အရောင်ကုဒ်色号</label><input class="ch-color">
+      <label>အလျားအနံ/规格</label><input class="ch-spec">
+      <label>အရေအတွက်/数量</label><input class="ch-qty">`;
+    chList.appendChild(el);
+    if(v.code) el.querySelector('.ch-code').value = v.code;
+    if(v.color) el.querySelector('.ch-color').value = v.color;
+    if(v.spec) el.querySelector('.ch-spec').value = v.spec;
+    if(v.qty) el.querySelector('.ch-qty').value = v.qty;
 
-function showImg(url){
-bigImg.src=url;
-imgModal.style.display="flex";
-}
+    const btn = el.querySelector('.ch-search');
+    const codeInput = el.querySelector('.ch-code');
+    const resDiv = el.querySelector('.mini-res');
 
-imgModal.onclick=()=>imgModal.style.display="none";
+    btn.addEventListener('click', ()=>{
+      const q = codeInput.value.trim().toLowerCase();
+      resDiv.innerHTML = '<div style="color:#666;padding:6px">查询中...</div>';
+      if(!q){ resDiv.innerHTML = '<div style="color:#c00;padding:6px">请输入编号</div>'; return; }
+      const res = stockData.filter(i => i.code && String(i.code).toLowerCase().includes(q));
+      if(!res.length){ resDiv.innerHTML = '<div style="color:#666;padding:6px">未找到库存信息</div>'; return; }
+      let html = '<div class="table-wrap"><table><thead><tr><th>编号</th><th>色号</th><th>数量(箱)</th><th>仓库</th></tr></thead><tbody>';
+      res.forEach(r => html += `<tr><td>${r.code}</td><td>${r.color||'-'}</td><td>${qtyBadge(r.quantity)}</td><td>${r.warehouse||''}</td></tr>`);
+      html += '</tbody></table></div>';
+      resDiv.innerHTML = html;
+    });
+  }
+  addChItem();
+  document.getElementById('ch_add').addEventListener('click', ()=>addChItem());
+  document.getElementById('ch_gen').addEventListener('click', ()=>{
+    const date = document.getElementById('ch_date').value;
+    const vehicle = document.getElementById('ch_vehicle').value;
+    const customer = document.getElementById('ch_customer').value;
+    let text = `出货计划\n日期：${date}\n单位或车牌：${vehicle}\n客户：${customer}\n\n`;
+    Array.from(chList.children).forEach((el,idx)=>{
+      const code = el.querySelector('.ch-code').value;
+      const color = el.querySelector('.ch-color').value;
+      const spec = el.querySelector('.ch-spec').value;
+      const qty = el.querySelector('.ch-qty').value;
+      text += `${idx+1}.ကုဒ်နိပတ်/编号：${code}\nအရောင်ကုဒ်色号：${color}\nအလျားအနံ/规格：${spec}\nအရေအัพท์/数量：${qty}\n\n`;
+    });
+    document.getElementById('ch_result').textContent = text.trim();
+    showToast('已生成出货计划');
+  });
+  document.getElementById('ch_copy').addEventListener('click', ()=>{ navigator.clipboard.writeText(document.getElementById('ch_result').textContent); showToast('已复制'); });
 
-/* ================= 查询 ================= */
+  // 海运入库
+  const hyList = document.getElementById('hy_items');
+  function addHyItem(v={}) {
+    const el = document.createElement('div'); el.className='item';
+    el.innerHTML = `
+      <label>ကုဒ်နိပတ်/编号</label><input class="hy-code">
+      <label>规格/အလျားအနံ</label><input class="hy-spec">
+      <label>色号/အရောင်ကုဒ်</label><input class="hy-color">
+      <label>数量/အရေအတွက်</label><input class="hy-qty">`;
+    hyList.appendChild(el);
+    if(v.code) el.querySelector('.hy-code').value = v.code;
+    if(v.spec) el.querySelector('.hy-spec').value = v.spec;
+    if(v.color) el.querySelector('.hy-color').value = v.color;
+    if(v.qty) el.querySelector('.hy-qty').value = v.qty;
+  }
+  addHyItem();
+  document.getElementById('hy_add').addEventListener('click', ()=>addHyItem());
+  document.getElementById('hy_gen').addEventListener('click', ()=>{
+    const date = document.getElementById('hy_date').value;
+    const container = document.getElementById('hy_container').value;
+    const warehouse = document.getElementById('hy_warehouse').value || '';
+    let text = `海运入库：${warehouse}\n日期：${date}\n柜号：${container}\n\n`;
+    Array.from(hyList.children).forEach((el,idx)=>{
+      const code = el.querySelector('.hy-code').value;
+      const spec = el.querySelector('.hy-spec').value;
+      const color = el.querySelector('.hy-color').value;
+      const qty = el.querySelector('.hy-qty').value;
+      text += `${idx+1}.ကုဒ်နိပတ်/编号：${code}\nအလျားအနံ/规格：${spec}\nအရောင်ကုဒ်色号：${color}\nအရေအาสตร์/数量：${qty}\n\n`;
+    });
+    document.getElementById('hy_result').textContent = text.trim();
+    showToast('已生成海运入库');
+  });
+  document.getElementById('hy_copy').addEventListener('click', ()=>{ navigator.clipboard.writeText(document.getElementById('hy_result').textContent); showToast('已复制'); });
 
-async function searchStock(){
-const snap=await db.ref('stock').once('value');
-const val=snap.val();
-resultBody.innerHTML="";
-if(!val)return;
+  // Admin modal behavior
+  const adminToggle = document.getElementById('adminToggle');
+  const adminModal = document.getElementById('adminModal');
+  const adminClose = document.getElementById('adminClose');
+  adminToggle.addEventListener('click', ()=>{ adminModal.style.display = 'flex'; });
+  adminClose.addEventListener('click', ()=>{ adminModal.style.display = 'none'; });
+  adminModal.addEventListener('click', (e)=>{ if(e.target === adminModal) adminModal.style.display='none'; });
 
-const kw=searchInput.value.toLowerCase();
+  document.getElementById('adminLogin').addEventListener('click', ()=>{
+    const pw = document.getElementById('adminPw').value.trim();
+    if(pw === 'admin'){ document.getElementById('adminArea').style.display='block'; showToast('管理员已登录'); }
+    else showToast('密码错误');
+  });
 
-Object.values(val).forEach(item=>{
-Object.entries(item.warehouses||{}).forEach(([w,qty])=>{
-if(qty>0 && item.code.toLowerCase().includes(kw)){
-const code=extractCode(item.code);
-const size=extractSize(item.code);
-const url=`https://raw.githubusercontent.com/li995913596-beep/title-plan/main/${code}.jpg`;
+  document.getElementById('btnPreview').addEventListener('click', ()=>{
+    const f = document.getElementById('excelInput').files[0];
+    if(!f){ showToast('请选择 Excel 文件'); return; }
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+      let items = [];
+      wb.SheetNames.forEach(name=>{
+        const ws = wb.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+        for(let r=0;r<rows.length;r++){
+          const row = rows[r];
+          const check = row[1] ? String(row[1]) : '';
+          if(String(check).includes('กระเบื้อง')) {
+            const code = row[1] ? String(row[1]).trim() : '';
+            const color = row[2] ? String(row[2]).trim() : '';
+            const qty = row[9] ? Number(row[9]) : 0;
+            if(code) items.push({ code, color, quantity: qty, warehouse: name });
+          }
+        }
+      });
+      document.getElementById('previewBox').innerHTML = '<pre style="max-height:280px;overflow:auto">'+JSON.stringify(items.slice(0,200),null,2)+'</pre>';
+      showToast('预览已生成');
+    };
+    reader.readAsArrayBuffer(f);
+  });
 
-resultBody.innerHTML+=`
-<tr>
-<td><img src="${url}" onclick="showImg('${url}')"
-onerror="this.src='https://raw.githubusercontent.com/li995913596-beep/title-plan/main/wutu.gif'"></td>
-<td>${code}</td>
-<td>${size}</td>
-<td>${item.color||''}</td>
-<td>${qty}</td>
-<td>${w}</td>
-</tr>`;
-}
-});
-});
-}
+  document.getElementById('btnSave').addEventListener('click', ()=>{
+    const f = document.getElementById('excelInput').files[0];
+    if(!f){ showToast('请选择 Excel 文件'); return; }
+    const reader = new FileReader();
+    reader.onload = async (e)=>{
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+      let items = [];
+      wb.SheetNames.forEach(name=>{
+        const ws = wb.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+        for(let r=0;r<rows.length;r++){
+          const row = rows[r];
+          const check = row[1] ? String(row[1]) : '';
+          if(String(check).includes('กระเบื้อง')) {
+            const code = row[1] ? String(row[1]).trim() : '';
+            const color = row[2] ? String(row[2]).trim() : '';
+            const qty = row[9] ? Number(row[9]) : 0;
+            if(code) items.push({ code, color, quantity: qty, warehouse: name });
+          }
+        }
+      });
+      if(!window.firebase){ showToast('Firebase 未就绪'); return; }
+      try{
+        const updateTime = new Date().toLocaleString();
+        await window.firebase.set(window.firebase.stockRef, { stockData: items, updateTime });
+        showToast('已保存到 Firebase');
+        stockData = items;
+        document.getElementById('lastInfo').textContent = '库存最后更新时间：' + updateTime;
+        adminModal.style.display='none';
+      }catch(err){ console.error(err); showToast('保存失败'); }
+    };
+    reader.readAsArrayBuffer(f);
+  });
 
-/* ================= 出库 ================= */
+  // initial load
+  setTimeout(()=>{ if(window.firebaseInitialized) loadStockData(); }, 600);
 
-async function searchOutStock(){
-const snap=await db.ref('stock').once('value');
-const val=snap.val();
-outResults.innerHTML="";
-if(!val)return;
+  // allow enter key for search
+  document.getElementById('searchCode').addEventListener('keypress', (e)=>{ if(e.key==='Enter') document.getElementById('searchBtn').click(); });
 
-const kw=outSearch.value.toLowerCase();
-
-Object.entries(val).forEach(([key,item])=>{
-if(item.code.toLowerCase().includes(kw)){
-Object.entries(item.warehouses||{}).forEach(([w,qty])=>{
-if(qty>0){
-outResults.innerHTML+=`
-<div class="card">
-<b>${item.code}</b> - ${w} - 库存:${qty}
-<input id="qty_${key}_${w}" type="number" placeholder="数量">
-<input id="customer_${key}_${w}" placeholder="客户名">
-<select id="paid_${key}_${w}">
-<option value="已付款">已付款</option>
-<option value="未付款">未付款</option>
-</select>
-<button class="small" onclick="confirmOut('${key}','${w}')">确认出库</button>
-</div>`;
-}
-});
-}
-});
-}
-
-async function confirmOut(key,warehouse){
-const qty = Number(document.getElementById(`qty_${key}_${warehouse}`).value);
-const customer = document.getElementById(`customer_${key}_${warehouse}`).value;
-const paid = document.getElementById(`paid_${key}_${warehouse}`).value;
-
-if(!qty || qty<=0) return alert("数量错误");
-if(!customer) return alert("请输入客户名");
-
-const snap = await db.ref('stock/'+key).once('value');
-const item = snap.val();
-
-if(item.warehouses[warehouse] < qty){
-return alert("库存不足");
-}
-
-item.warehouses[warehouse] -= qty;
-await db.ref('stock/'+key).set(item);
-
-await db.ref('operationLogs/'+Date.now()).set({
-type:"OUT",
-code:item.code,
-size:extractSize(item.code),
-color:item.color,
-quantity:qty,
-warehouse,
-customer,
-paid,
-operator,
-time:new Date().toLocaleString()
-});
-
-alert("出库成功");
-searchOutStock();
-}
-
-/* ================= 入库 ================= */
-
-async function searchInStock(){
-const snap=await db.ref('stock').once('value');
-const val=snap.val();
-inResults.innerHTML="";
-if(!val)return;
-
-const kw=inSearch.value.toLowerCase();
-
-Object.entries(val).forEach(([key,item])=>{
-if(item.code.toLowerCase().includes(kw)){
-Object.entries(item.warehouses||{}).forEach(([w,qty])=>{
-inResults.innerHTML+=`
-<div class="card">
-${item.code} - ${w} - 当前库存:${qty}
-<button class="small" onclick="confirmInExisting('${key}','${w}')">入库</button>
-</div>`;
-});
-}
-});
-}
-
-async function confirmInExisting(key,warehouse){
-const qty=Number(prompt("输入入库数量"));
-if(!qty||qty<=0)return;
-
-const snap=await db.ref('stock/'+key).once('value');
-const item=snap.val();
-
-item.warehouses[warehouse]+=qty;
-await db.ref('stock/'+key).set(item);
-
-await db.ref('operationLogs/'+Date.now()).set({
-type:"IN",
-code:item.code,
-size:extractSize(item.code),
-color:item.color,
-quantity:qty,
-warehouse,
-operator,
-time:new Date().toLocaleString()
-});
-
-alert("入库成功");
-searchInStock();
-}
-
-async function createNewStock(){
-const code=newCode.value.trim();
-const size=newSize.value.trim();
-const color=newColor.value.trim();
-const warehouse=newWarehouse.value;
-const qty=Number(newQty.value);
-
-if(!code||!size||!qty)return alert("填写完整");
-
-const key=code+"_"+size;
-
-let item={
-code:`${code} ${size}`,
-color,
-warehouses:{K38:0,K39:0,"1号仓库":0}
-};
-
-item.warehouses[warehouse]=qty;
-
-await db.ref('stock/'+key).set(item);
-alert("新增成功");
-}
-
-/* ================= 日志 ================= */
-
-async function loadLogs(){
-const snap=await db.ref('operationLogs').once('value');
-const val=snap.val();
-logBody.innerHTML="";
-
-Object.values(val||{}).forEach(l=>{
-logBody.innerHTML+=`
-<tr>
-<td>${l.time}</td>
-<td>${l.type}</td>
-<td>${l.code}</td>
-<td>${l.size||''}</td>
-<td>${l.color||''}</td>
-<td>${l.quantity}</td>
-<td>${l.warehouse}</td>
-<td>${l.customer||''}</td>
-<td>${l.paid||''}</td>
-<td>${l.operator}</td>
-</tr>`;
-});
-}
-
-async function downloadLogs(){
-const snap=await db.ref('operationLogs').once('value');
-const val=snap.val();
-if(!val){alert("暂无日志");return;}
-
-let csv="时间,类型,编号,规格,色号,数量,仓库,客户,付款,操作人\n";
-
-Object.values(val).forEach(l=>{
-csv+=`${l.time},${l.type},${l.code},${l.size||''},${l.color||''},${l.quantity},${l.warehouse},${l.customer||''},${l.paid||''},${l.operator}\n`;
-});
-
-const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
-const link=document.createElement("a");
-link.href=URL.createObjectURL(blob);
-link.download="库存日志.csv";
-link.click();
-}
-
-/* ================= 上传 ================= */
-
-function uploadExcel(){
-const file=document.getElementById("excelFile").files[0];
-if(!file) return alert("请选择文件");
-
-const reader=new FileReader();
-reader.onload=function(e){
-const data=new Uint8Array(e.target.result);
-const workbook=XLSX.read(data,{type:'array'});
-const sheet=workbook.Sheets[workbook.SheetNames[0]];
-const json=XLSX.utils.sheet_to_json(sheet);
-
-json.forEach(async row=>{
-const key=row["编号"]+"_"+row["规格"];
-await db.ref("stock/"+key).set({
-code:row["编号"],
-size:row["规格"],
-color:row["色号"]||"-",
-warehouses:{
-K38:row["K38"]||0,
-K39:row["K39"]||0,
-"1号仓库":row["1号仓库"]||0
-}
-});
-});
-
-alert("上传完成");
-};
-reader.readAsArrayBuffer(file);
-}
-
+})();
 </script>
 
+<!-- Injected image preview modal (revised) -->
+<div id="imgPreviewModal" style="display:none;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999">
+  <img id="imgPreviewModalImg" src="" style="max-width:92%;max-height:92%;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.6)" onclick="event.stopPropagation()">
+</div>
+<script>
+function showImageModal(src){
+  var m=document.getElementById('imgPreviewModal');
+  var im=document.getElementById('imgPreviewModalImg');
+  im.src=src||'';
+  m.style.display='flex';
+}
+function hideImageModal(){
+  var m=document.getElementById('imgPreviewModal');
+  var im=document.getElementById('imgPreviewModalImg');
+  im.src='';
+  m.style.display='none';
+}
+document.getElementById('imgPreviewModal').onclick=function(){ hideImageModal(); };
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideImageModal(); });
+</script>
+
+
+<script>
+(function(){
+  const IMG_BASE = "https://raw.githubusercontent.com/li995913596-beep/title-plan/main/";
+  function placeholderDataURI(){
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="100%" height="100%" fill="%23f7f7f7"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="14">No image</text></svg>');
+  }
+  function extractCodeFromText(text){
+    if(!text) return '';
+    const s = String(text).trim();
+    const tokens = s.split(/[\s,;\/\\]+/).map(t=>t.trim()).filter(Boolean);
+    if(tokens.length === 0) return '';
+    for(const t of tokens){ if(/\d/.test(t)) return t; }
+    for(const t of tokens){ if(t.length>=2 && t.length<=60) return t; }
+    return tokens[0] || '';
+  }
+  function loadImgIntoCell(cell, code){
+    try{
+      if(!cell) return;
+      // clear placeholder
+      cell.innerHTML = '';
+      if(!code) { cell.innerHTML = ''; return; }
+      var img = document.createElement('img');
+      img.alt = code;
+      img.style.width='80px'; img.style.height='56px'; img.style.objectFit='cover'; img.style.borderRadius='6px'; img.style.cursor='zoom-in';
+      img.src = IMG_BASE + encodeURIComponent(code) + '.jpg';
+      img.onerror = function(){
+        if(this._t === undefined){ this._t = 1; this.src = IMG_BASE + encodeURIComponent(code) + '.jpeg'; }
+        else if(this._t === 1){ this._t = 2; this.src = IMG_BASE + encodeURIComponent(code) + '.png'; }
+        else { this.src = IMG_BASE + 'wutu.gif'; }
+      };
+      img.addEventListener('click', function(e){ e.stopPropagation(); showImageModal(img.src); });
+      cell.appendChild(img);
+    }catch(e){ console.warn(e); }
+  }
+
+  // Process tables initially and for dynamic rows
+  function processTables(){
+    const tables = document.querySelectorAll('table');
+    tables.forEach(table=>{
+      const tbody = table.tBodies[0] || table;
+      Array.from(tbody.querySelectorAll('tr')).forEach(row=>{
+        if(!row.querySelector('.img-cell')){
+          const imgTd = document.createElement('td');
+          imgTd.className = 'img-cell';
+          imgTd.innerHTML = '&#8203;'; // zero-width placeholder
+          row.insertBefore(imgTd, row.firstChild);
+          const codeCell = row.children[1];
+          const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
+          const code = extractCodeFromText(codeText);
+          loadImgIntoCell(imgTd, code);
+        } else {
+          const cell = row.querySelector('.img-cell');
+          if(cell && !cell.querySelector('img')){
+            const codeCell = row.children[1];
+            const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
+            const code = extractCodeFromText(codeText);
+            loadImgIntoCell(cell, code);
+          }
+        }
+      });
+      // observe future additions
+      const obs = new MutationObserver(muts=>{
+        muts.forEach(mut=>{
+          mut.addedNodes && mut.addedNodes.forEach(node=>{
+            if(node && node.nodeType===1 && node.tagName.toLowerCase()==='tr'){
+              if(!node.querySelector('.img-cell')){
+                const imgTd = document.createElement('td');
+                imgTd.className = 'img-cell';
+                imgTd.innerHTML = '&#8203;';
+                node.insertBefore(imgTd, node.firstChild);
+                const codeCell = node.children[1];
+                const codeText = codeCell ? (codeCell.textContent || codeCell.innerText || '') : '';
+                const code = extractCodeFromText(codeText);
+                loadImgIntoCell(imgTd, code);
+              }
+            }
+          });
+        });
+      });
+      obs.observe(tbody, { childList:true });
+    });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', processTables);
+  else processTables();
+
+  window.nsTileImageHelpers = { loadImgIntoCell, processTables, extractCodeFromText };
+})();
+</script>
+
+
+<script>
+// Ensure global aliases exist so renderResults (which may be outside the IIFE) can call them
+(function(){
+  function safeCall(name, args){
+    try{
+      if(window.nsTileImageHelpers && typeof window.nsTileImageHelpers[name] === 'function'){
+        return window.nsTileImageHelpers[name].apply(null, args);
+      }
+      if(typeof window[name] === 'function'){
+        return window[name].apply(null, args);
+      }
+    }catch(e){ console.warn('safeCall error', name, e); }
+  }
+  // alias as functions if not already global
+  if(typeof window.loadImgIntoCell !== 'function'){
+    window.loadImgIntoCell = function(cell, code){ return safeCall('loadImgIntoCell', [cell, code]); };
+  }
+  if(typeof window.extractCodeFromText !== 'function'){
+    window.extractCodeFromText = function(text){ return safeCall('extractCodeFromText', [text]); };
+  }
+  // also expose the helpers object if missing but individual functions exist globally
+  if(!window.nsTileImageHelpers){
+    window.nsTileImageHelpers = {
+      loadImgIntoCell: window.loadImgIntoCell,
+      extractCodeFromText: window.extractCodeFromText,
+      processTables: window.processTables
+    };
+  }
+})();
+</script>
 </body>
+</html>
+
 </html>
